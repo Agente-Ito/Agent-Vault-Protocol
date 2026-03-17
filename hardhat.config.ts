@@ -9,21 +9,19 @@ const LUKSO_MAINNET_RPC = process.env.LUKSO_MAINNET_RPC ?? "https://rpc.mainnet.
 const BASE_MAINNET_RPC  = process.env.BASE_MAINNET_RPC  ?? "https://mainnet.base.org";
 const BASE_SEPOLIA_RPC  = process.env.BASE_SEPOLIA_RPC  ?? "https://sepolia.base.org";
 
-// Parse PRIVATE_KEY - can be single key or comma-separated list
-const getPrivateKeys = (): string[] => {
-  if (!process.env.PRIVATE_KEY) return [];
-  const keys = process.env.PRIVATE_KEY.split(",").map((k) => k.trim()).filter(Boolean);
-  const valid = keys.filter((k) => {
+const parseKey = (raw: string | undefined): string[] => {
+  if (!raw) return [];
+  const keys = raw.split(",").map((k) => k.trim()).filter(Boolean);
+  return keys.filter((k) => {
     const normalized = k.startsWith("0x") ? k.slice(2) : k;
     return normalized.length === 64;
   });
-  if (valid.length !== keys.length) {
-    console.warn(
-      `⚠️  WARNING: Found ${keys.length} PRIVATE_KEY entries, but only ${valid.length} are valid 64-char hex strings.`
-    );
-  }
-  return valid;
 };
+
+// PRIVATE_KEY      → LUKSO networks (and fallback for Base if BASE_PRIVATE_KEY not set)
+// BASE_PRIVATE_KEY → Base networks (overrides PRIVATE_KEY for Base)
+const getLuksoKeys = () => parseKey(process.env.PRIVATE_KEY);
+const getBaseKeys  = () => parseKey(process.env.BASE_PRIVATE_KEY ?? process.env.PRIVATE_KEY);
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -61,7 +59,7 @@ const config: HardhatUserConfig = {
     luksoTestnet: {
       url: LUKSO_TESTNET_RPC,
       chainId: 4201,
-      accounts: getPrivateKeys(),
+      accounts: getLuksoKeys(),
       gasPrice: "auto",
       timeout: 60000,
     },
@@ -70,7 +68,7 @@ const config: HardhatUserConfig = {
     luksoMainnet: {
       url: LUKSO_MAINNET_RPC,
       chainId: 42,
-      accounts: getPrivateKeys(),
+      accounts: getLuksoKeys(),
       gasPrice: "auto",
       timeout: 60000,
     },
@@ -79,7 +77,7 @@ const config: HardhatUserConfig = {
     baseMainnet: {
       url: BASE_MAINNET_RPC,
       chainId: 8453,
-      accounts: getPrivateKeys(),
+      accounts: getBaseKeys(),
       gasPrice: "auto",
       timeout: 60000,
     },
@@ -88,7 +86,7 @@ const config: HardhatUserConfig = {
     baseSepolia: {
       url: BASE_SEPOLIA_RPC,
       chainId: 84532,
-      accounts: getPrivateKeys(),
+      accounts: getBaseKeys(),
       gasPrice: "auto",
       timeout: 60000,
     },

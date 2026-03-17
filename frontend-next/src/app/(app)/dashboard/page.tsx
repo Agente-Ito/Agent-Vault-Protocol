@@ -55,8 +55,8 @@ export default function DashboardPage() {
   const steps = [
     { done: isConnected, label: 'Connect your wallet' },
     { done: vaults.length > 0, label: 'Create your first vault' },
-    { done: !!COORDINATOR_ADDRESS, label: 'Configure AgentCoordinator' },
-    { done: !!SCHEDULER_ADDRESS, label: 'Configure TaskScheduler' },
+    { done: !!COORDINATOR_ADDRESS, label: 'Set up your Agents registry' },
+    { done: !!SCHEDULER_ADDRESS, label: 'Enable automated payments' },
   ];
   const allDone = steps.every((s) => s.done);
 

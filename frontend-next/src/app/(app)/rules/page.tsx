@@ -69,7 +69,7 @@ function VaultPolicies({ safeAddress }: { safeAddress: string }) {
       )}
 
       {hasBudget && (
-        <PolicyCard title="Budget Policy" badge={<Badge variant="primary">Active</Badge>}>
+        <PolicyCard title="Spending Limit" badge={<Badge variant="primary">Active</Badge>}>
           <Row label="Max budget" value={`${policySummary.budget} LYX`} />
           <Row label="Spent this period" value={`${policySummary.spent ?? '0'} LYX`} />
           {policySummary.periodStart && (
@@ -96,7 +96,11 @@ function VaultPolicies({ safeAddress }: { safeAddress: string }) {
       )}
 
       {hasMerchants && (
-        <PolicyCard title="Merchant Policy" badge={<Badge variant="warning">Whitelist</Badge>}>
+        <PolicyCard title="Approved Merchants" badge={<Badge variant="warning">Restricted</Badge>}>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-md">
+            Only the addresses below can receive payments from this vault. Any attempt to send funds
+            to a different address will be blocked automatically.
+          </p>
           {policySummary.merchants!.length === 0 ? (
             <p className="text-sm text-neutral-500">No merchants in whitelist.</p>
           ) : (
@@ -106,14 +110,14 @@ function VaultPolicies({ safeAddress }: { safeAddress: string }) {
                   {m}
                 </p>
               ))}
-              <p className="text-xs text-neutral-500 mt-xs">{policySummary.merchants!.length} address(es) whitelisted</p>
+              <p className="text-xs text-neutral-500 mt-xs">{policySummary.merchants!.length} address(es) approved</p>
             </div>
           )}
         </PolicyCard>
       )}
 
       {hasExpiry && (
-        <PolicyCard title="Expiration Policy" badge={<Badge variant="neutral">Time-limited</Badge>}>
+        <PolicyCard title="Vault Expiry" badge={<Badge variant="neutral">Expires</Badge>}>
           <Row
             label="Expires"
             value={new Date(Number(policySummary.expiration) * 1000).toLocaleString()}

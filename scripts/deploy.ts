@@ -31,18 +31,46 @@ async function main() {
     throw new Error("❌ Deployer balance is 0. Please fund your account on LUKSO testnet.");
   }
 
+  // Track nonce manually — querying RPC after each confirm can return stale data
+  let nonce = await ethers.provider.getTransactionCount(deployer.address, "pending");
+  console.log(`   Starting nonce: ${nonce}`);
+
   // 1. Deploy MerchantRegistry
-  console.log("\n📦 Deploying MerchantRegistry...");
+  console.log("\n[1/5] Deploying MerchantRegistry...");
   const MerchantRegistryFactory = await ethers.getContractFactory("MerchantRegistry");
-  const merchantRegistry = await MerchantRegistryFactory.deploy();
+  const merchantRegistry = await MerchantRegistryFactory.deploy({ nonce: nonce++ });
   const merchantRegistryAddr = await merchantRegistry.getAddress();
   await merchantRegistry.waitForDeployment();
   console.log("✅ MerchantRegistry:", merchantRegistryAddr);
 
-  // 2. Deploy AgentVaultRegistry
-  console.log("\n📦 Deploying AgentVaultRegistry...");
+  // 2. Deploy AgentVaultDeployerCore
+  console.log("\n[2/5] Deploying AgentVaultDeployerCore...");
+  const CoreFactory = await ethers.getContractFactory("AgentVaultDeployerCore");
+  const vdCore = await CoreFactory.deploy({ nonce: nonce++ });
+  await vdCore.waitForDeployment();
+  const coreAddr = await vdCore.getAddress();
+  console.log("✅ AgentVaultDeployerCore:", coreAddr);
+
+  // 3. Deploy AgentVaultDeployer
+  console.log("\n[3/5] Deploying AgentVaultDeployer...");
+  const DeployerFactory = await ethers.getContractFactory("AgentVaultDeployer");
+  const vd = await DeployerFactory.deploy({ nonce: nonce++ });
+  await vd.waitForDeployment();
+  const vdAddr = await vd.getAddress();
+  console.log("✅ AgentVaultDeployer:", vdAddr);
+
+  // 4. Deploy AgentKMDeployer
+  console.log("\n[4/5] Deploying AgentKMDeployer...");
+  const KMFactory = await ethers.getContractFactory("AgentKMDeployer");
+  const km = await KMFactory.deploy({ nonce: nonce++ });
+  await km.waitForDeployment();
+  const kmDeployerAddr = await km.getAddress();
+  console.log("✅ AgentKMDeployer:", kmDeployerAddr);
+
+  // 5. Deploy AgentVaultRegistry
+  console.log("\n[5/5] Deploying AgentVaultRegistry...");
   const AgentVaultRegistryFactory = await ethers.getContractFactory("AgentVaultRegistry");
-  const registry = await AgentVaultRegistryFactory.deploy();
+  const registry = await AgentVaultRegistryFactory.deploy(coreAddr, vdAddr, kmDeployerAddr, { nonce: nonce++ });
   const registryAddr = await registry.getAddress();
   await registry.waitForDeployment();
   console.log("✅ AgentVaultRegistry:", registryAddr);
@@ -60,6 +88,7 @@ async function main() {
     budgetToken: ethers.ZeroAddress,     // LYX budget
     expiration: ONE_WEEK_FROM_NOW,       // expires in 7 days
     agents: [agentWallet.address],
+    agentBudgets: [],                    // no per-agent budgets for demo
     merchants: [deployer.address],       // deployer as demo merchant
     label: "Demo Vault – Weekly Budget",
   };
@@ -97,8 +126,9 @@ async function main() {
   console.log("  LSP6KeyManager: ", kmAddr);
   console.log("  PolicyEngine:   ", peAddr);
 
-  // 4. Accept ownership (LSP14 two-step)
-  console.log("\n🔐 Accepting ownership...");
+  // 4. Accept ownership on AgentSafe (LSP14 two-step — only Safe uses LSP14)
+  //    PolicyEngine and BudgetPolicy use OZ Ownable (single-step), no acceptOwnership needed.
+  console.log("\n🔐 Accepting ownership on AgentSafe (LSP14)...");
   const safe = await ethers.getContractAt("AgentSafe", safeAddr);
 
   try {
@@ -110,34 +140,11 @@ async function main() {
     throw err;
   }
 
-  const pe = await ethers.getContractAt("PolicyEngine", peAddr);
-  try {
-    const acceptPeTx = await pe.acceptOwnership();
-    await acceptPeTx.wait();
-    console.log("✅ Ownership accepted on PolicyEngine");
-  } catch (err: any) {
-    console.error("⚠️  PolicyEngine acceptOwnership failed:", err.message);
-    throw err;
-  }
-
-  // Also accept BudgetPolicy (deployed by registry)
-  const budgetPolicies = await pe.getPolicies();
-  if (budgetPolicies.length > 0) {
-    const budgetPolicy = await ethers.getContractAt("BudgetPolicy", budgetPolicies[0]);
-    try {
-      const acceptBpTx = await budgetPolicy.acceptOwnership();
-      await acceptBpTx.wait();
-      console.log("✅ Ownership accepted on BudgetPolicy");
-    } catch (err) {
-      console.warn("⚠️  BudgetPolicy acceptOwnership skipped (may not be needed)");
-    }
-  }
-
   // 5. Fund the safe
-  console.log("\n💸 Funding vault with 50 LYX...");
+  console.log("\n💸 Funding vault with 1 LYX...");
   const fundTx = await deployer.sendTransaction({
     to: safeAddr,
-    value: ethers.parseEther("50"),
+    value: ethers.parseEther("1"),
   });
   await fundTx.wait();
   const safeBalance = await ethers.provider.getBalance(safeAddr);
@@ -191,6 +198,9 @@ async function main() {
 
   // 8. Block explorer links
   console.log("\n🔍 Block Explorer Links (LUKSO Testnet):");
+  console.log(`  DeployerCore:   https://explorer.testnet.lukso.network/address/${coreAddr}`);
+  console.log(`  Deployer:       https://explorer.testnet.lukso.network/address/${vdAddr}`);
+  console.log(`  KMDeployer:     https://explorer.testnet.lukso.network/address/${kmDeployerAddr}`);
   console.log(`  Registry:       https://explorer.testnet.lukso.network/address/${registryAddr}`);
   console.log(`  Safe:           https://explorer.testnet.lukso.network/address/${safeAddr}`);
   console.log(`  KeyManager:     https://explorer.testnet.lukso.network/address/${kmAddr}`);
@@ -200,7 +210,7 @@ async function main() {
   console.log("\n========================================");
   console.log("✅ Deployment Successful!");
   console.log("========================================");
-  console.log(JSON.stringify(result, null, 2));
+  console.log(JSON.stringify(result, (_, v) => typeof v === "bigint" ? v.toString() : v, 2));
   console.log("\n⚠️  IMPORTANT:");
   console.log("   • Agent wallet private key is printed above. Store it securely!");
   console.log("   • The vault is funded with 50 LYX for testing");

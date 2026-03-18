@@ -8,6 +8,7 @@ import { useMode } from '@/context/ModeContext';
 import { useI18n } from '@/context/I18nContext';
 import { useWeb3 } from '@/context/Web3Context';
 import { useUniversalProfile } from '@/hooks/useUniversalProfile';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Button } from '@/components/common/Button';
 import { Badge } from '@/components/common/Badge';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
@@ -71,42 +72,39 @@ function UPAvatar({
   );
 }
 
-// ─── Login button ─────────────────────────────────────────────────────────────
+// ─── Connect button (RainbowKit) ──────────────────────────────────────────────
 
-function LoginButton({
-  hasUPExtension,
-  onConnect,
-}: {
-  hasUPExtension: boolean;
-  onConnect?: () => void;
-}) {
+function RainbowConnectButton({ onConnect }: { onConnect?: () => void }) {
   const { t } = useI18n();
-
-  if (hasUPExtension) {
-    return (
-      <div className="flex flex-col items-end gap-0.5">
-        <button
-          onClick={onConnect}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lukso-gradient text-white text-xs font-semibold shadow-sm hover:opacity-90 transition-opacity"
-          style={{ background: 'linear-gradient(135deg, #FE005B 0%, #FF9B00 100%)' }}
-        >
-          <span>🌐</span>
-          {t('up.login_button')}
-        </button>
-        <button
-          onClick={onConnect}
-          className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
-        >
-          {t('up.metamask_fallback')}
-        </button>
-      </div>
-    );
-  }
+  const { hasUPExtension } = useWeb3();
 
   return (
-    <Button size="sm" variant="primary" onClick={onConnect}>
-      {t('common.connect_wallet')}
-    </Button>
+    <ConnectButton.Custom>
+      {({ openConnectModal, mounted }) => {
+        if (!mounted) return null;
+        const handleClick = () => {
+          openConnectModal();
+          onConnect?.();
+        };
+        if (hasUPExtension) {
+          return (
+            <button
+              onClick={handleClick}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold shadow-sm hover:opacity-90 transition-opacity"
+              style={{ background: 'linear-gradient(135deg, #FE005B 0%, #FF9B00 100%)' }}
+            >
+              <span>🌐</span>
+              {t('up.login_button')}
+            </button>
+          );
+        }
+        return (
+          <Button size="sm" variant="primary" onClick={handleClick}>
+            {t('common.connect_wallet')}
+          </Button>
+        );
+      }}
+    </ConnectButton.Custom>
   );
 }
 
@@ -122,7 +120,7 @@ interface TopBarProps {
 export function TopBar({ account, chainId, onMenuClick, onConnect }: TopBarProps) {
   const { mode, setMode } = useMode();
   const { t, locale, setLocale } = useI18n();
-  const { isUniversalProfile, hasUPExtension } = useWeb3();
+  const { isUniversalProfile } = useWeb3();
   const pathname = usePathname();
 
   const pageMeta  = resolvePageMeta(pathname);
@@ -243,7 +241,7 @@ export function TopBar({ account, chainId, onMenuClick, onConnect }: TopBarProps
               />
             </div>
           ) : (
-            <LoginButton hasUPExtension={hasUPExtension} onConnect={onConnect} />
+            <RainbowConnectButton onConnect={onConnect} />
           )}
         </div>
       </div>

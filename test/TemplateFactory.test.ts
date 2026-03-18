@@ -3,6 +3,9 @@ import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import {
   AgentVaultRegistry,
+  AgentVaultDeployerCore,
+  AgentVaultDeployer,
+  AgentKMDeployer,
   TemplateFactory,
   AgentSafe,
   LSP6KeyManager,
@@ -28,9 +31,20 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
   beforeEach(async function () {
     [owner, agent1, agent2, merchant] = await ethers.getSigners();
 
+    const coreC = await ethers.getContractFactory("AgentVaultDeployerCore");
+    const vdCore = await coreC.deploy() as AgentVaultDeployerCore;
+    const deployerC = await ethers.getContractFactory("AgentVaultDeployer");
+    const vd = await deployerC.deploy() as AgentVaultDeployer;
+    const kmC = await ethers.getContractFactory("AgentKMDeployer");
+    const km = await kmC.deploy() as AgentKMDeployer;
+
     // Deploy registry
     const RegistryFactory = await ethers.getContractFactory("AgentVaultRegistry");
-    registry = await RegistryFactory.deploy();
+    registry = await RegistryFactory.deploy(
+      await vdCore.getAddress(),
+      await vd.getAddress(),
+      await km.getAddress(),
+    ) as AgentVaultRegistry;
 
     // Deploy factory
     const FactoryFactory = await ethers.getContractFactory("TemplateFactory");

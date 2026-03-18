@@ -45,17 +45,28 @@ async function main() {
   const entryPoint = ENTRY_POINTS[network] ?? ENTRY_POINTS.hardhat;
   console.log(`   EntryPoint (ERC-4337 v0.6): ${entryPoint}`);
 
+  // Fetch current fee data and bump priority fee to avoid replacement issues
+  const feeData = await ethers.provider.getFeeData();
+  const maxFeePerGas         = feeData.maxFeePerGas         ? feeData.maxFeePerGas         * 2n : undefined;
+  const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas ? feeData.maxPriorityFeePerGas * 2n : undefined;
+  const txOverrides = maxFeePerGas ? { maxFeePerGas, maxPriorityFeePerGas } : {};
+  console.log(`   Gas: maxFee=${maxFeePerGas ? ethers.formatUnits(maxFeePerGas, "gwei") + " gwei" : "auto"}`);
+
+  // Track nonce manually — querying RPC after each confirm can return stale data
+  let nonce = await ethers.provider.getTransactionCount(deployer.address, "pending");
+  console.log(`   Starting nonce: ${nonce}`);
+
   // ── Deploy deployer contracts ──────────────────────────────────────────────
   console.log("\n[1/3] Deploying BaseVaultDeployerCore…");
   const CoreF  = await ethers.getContractFactory("BaseVaultDeployerCore");
-  const core   = await CoreF.deploy();
+  const core   = await CoreF.deploy({ ...txOverrides, nonce: nonce++ });
   await core.waitForDeployment();
   const coreAddr = await core.getAddress();
   console.log(`      ✅ BaseVaultDeployerCore: ${coreAddr}`);
 
   console.log("\n[2/3] Deploying BaseVaultDeployer…");
   const DeployerF  = await ethers.getContractFactory("BaseVaultDeployer");
-  const deployerC  = await DeployerF.deploy();
+  const deployerC  = await DeployerF.deploy({ ...txOverrides, nonce: nonce++ });
   await deployerC.waitForDeployment();
   const deployerAddr = await deployerC.getAddress();
   console.log(`      ✅ BaseVaultDeployer: ${deployerAddr}`);
@@ -63,7 +74,7 @@ async function main() {
   // ── Deploy BaseVaultFactory ────────────────────────────────────────────────
   console.log("\n[3/3] Deploying BaseVaultFactory…");
   const FactoryF  = await ethers.getContractFactory("BaseVaultFactory");
-  const factory   = await FactoryF.deploy(entryPoint, coreAddr, deployerAddr);
+  const factory   = await FactoryF.deploy(entryPoint, coreAddr, deployerAddr, { ...txOverrides, nonce: nonce++ });
   await factory.waitForDeployment();
   const factoryAddr = await factory.getAddress();
   console.log(`      ✅ BaseVaultFactory: ${factoryAddr}`);

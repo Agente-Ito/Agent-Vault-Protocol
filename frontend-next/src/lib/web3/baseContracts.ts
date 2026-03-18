@@ -147,45 +147,22 @@ export function isBaseFactoryConfigured(): boolean {
   return !!process.env.NEXT_PUBLIC_BASE_VAULT_FACTORY_ADDRESS;
 }
 
-// ─── Network switching ────────────────────────────────────────────────────────
+// ─── Network switching (wagmi-based) ──────────────────────────────────────────
 
-type EthereumProvider = {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-};
-
-/** Ask MetaMask to switch to Base. Adds the chain if not present. */
+/** Ask the connected wallet to switch to Base via wagmi switchChain action. */
 export async function switchToBase(): Promise<void> {
-  const eth = (typeof window !== 'undefined' ? (window as Window & { ethereum?: EthereumProvider }).ethereum : undefined);
-  if (!eth) throw new Error('No injected provider (MetaMask) found');
-
-  const chainHex = `0x${BASE_CHAIN_ID.toString(16)}`;
-  try {
-    await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: chainHex }] });
-  } catch (err: unknown) {
-    const switchErr = err as { code?: number };
-    if (switchErr.code === 4902) {
-      const isMainnet = BASE_CHAIN_ID === 8453;
-      await eth.request({
-        method: 'wallet_addEthereumChain',
-        params: [{
-          chainId: chainHex,
-          chainName: isMainnet ? 'Base' : 'Base Sepolia Testnet',
-          nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-          rpcUrls: [isMainnet ? 'https://mainnet.base.org' : 'https://sepolia.base.org'],
-          blockExplorerUrls: [isMainnet ? 'https://basescan.org' : 'https://sepolia.basescan.org'],
-        }],
-      });
-    } else {
-      throw err;
-    }
-  }
+  // Dynamic import to avoid pulling wagmiConfig into SSR bundle
+  const { switchChain } = await import('@wagmi/core');
+  const { wagmiConfig } = await import('./wagmiConfig');
+  await switchChain(wagmiConfig, { chainId: BASE_CHAIN_ID as 84532 | 8453 });
 }
 
-/** Get a Base-network signer from window.ethereum (after switchToBase). */
+/** Get a Base-network ethers signer via wagmi getWalletClient. */
 export async function getBaseSigner() {
-  const eth = (typeof window !== 'undefined' ? (window as Window & { ethereum?: EthereumProvider }).ethereum : undefined);
-  if (!eth) throw new Error('No injected provider found');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const provider = new ethers.BrowserProvider(eth as any);
-  return provider.getSigner();
+  const { getWalletClient } = await import('@wagmi/core');
+  const { wagmiConfig } = await import('./wagmiConfig');
+  const { walletClientToSigner } = await import('./signerBridge');
+  const walletClient = await getWalletClient(wagmiConfig, { chainId: BASE_CHAIN_ID });
+  if (!walletClient) throw new Error('No wallet connected');
+  return walletClientToSigner(walletClient);
 }

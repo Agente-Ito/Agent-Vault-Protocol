@@ -3,6 +3,9 @@ import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import {
   AgentVaultRegistry,
+  AgentVaultDeployerCore,
+  AgentVaultDeployer,
+  AgentKMDeployer,
   AgentSafe,
   PolicyEngine,
   BudgetPolicy,
@@ -25,9 +28,20 @@ describe("AgentBudgetPolicy - Hybrid Budget Model", function () {
   beforeEach(async function () {
     [owner, agent1, agent2, merchant] = await ethers.getSigners();
 
+    const coreC = await ethers.getContractFactory("AgentVaultDeployerCore");
+    const vdCore = await coreC.deploy() as AgentVaultDeployerCore;
+    const deployerC = await ethers.getContractFactory("AgentVaultDeployer");
+    const vd = await deployerC.deploy() as AgentVaultDeployer;
+    const kmC = await ethers.getContractFactory("AgentKMDeployer");
+    const km = await kmC.deploy() as AgentKMDeployer;
+
     // Deploy registry
     const RegistryFactory = await ethers.getContractFactory("AgentVaultRegistry");
-    const registry = await RegistryFactory.deploy();
+    const registry = await RegistryFactory.deploy(
+      await vdCore.getAddress(),
+      await vd.getAddress(),
+      await km.getAddress(),
+    ) as AgentVaultRegistry;
     registryAddr = await registry.getAddress();
 
     // Deploy vault WITH agent budgets (hybrid model)

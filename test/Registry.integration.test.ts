@@ -3,6 +3,9 @@ import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import {
   AgentVaultRegistry,
+  AgentVaultDeployerCore,
+  AgentVaultDeployer,
+  AgentKMDeployer,
   AgentSafe,
   LSP6KeyManager,
   BudgetPolicy,
@@ -19,8 +22,22 @@ describe("AgentVaultRegistry — Integration", function () {
 
   beforeEach(async function () {
     [owner, agent, merchant] = await ethers.getSigners();
+
+    const coreC = await ethers.getContractFactory("AgentVaultDeployerCore");
+    const vdCore = await coreC.deploy() as AgentVaultDeployerCore;
+
+    const deployerC = await ethers.getContractFactory("AgentVaultDeployer");
+    const vd = await deployerC.deploy() as AgentVaultDeployer;
+
+    const kmC = await ethers.getContractFactory("AgentKMDeployer");
+    const km = await kmC.deploy() as AgentKMDeployer;
+
     const RegistryFactory = await ethers.getContractFactory("AgentVaultRegistry");
-    registry = await RegistryFactory.deploy();
+    registry = await RegistryFactory.deploy(
+      await vdCore.getAddress(),
+      await vd.getAddress(),
+      await km.getAddress(),
+    ) as AgentVaultRegistry;
   });
 
   async function deployVault(params?: Partial<{

@@ -5,6 +5,8 @@ import { Web3Provider } from '@/context/Web3Context';
 import { OnboardingProvider } from '@/context/OnboardingContext';
 import { I18nProvider } from '@/context/I18nContext';
 import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
+import { Web3Providers } from './providers';
+import '@rainbow-me/rainbowkit/styles.css';
 import './globals.css';
 
 const geistSans = Geist({
@@ -30,16 +32,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Web3Provider>
-          <I18nProvider>
-            <ModeProvider>
-              <OnboardingProvider>
-                {children}
-                <OnboardingModal />
-              </OnboardingProvider>
-            </ModeProvider>
-          </I18nProvider>
-        </Web3Provider>
+        <Web3Providers>
+          <Web3Provider>
+            <I18nProvider>
+              <ModeProvider>
+                <OnboardingProvider>
+                  {children}
+                  <OnboardingModal />
+                </OnboardingProvider>
+              </ModeProvider>
+            </I18nProvider>
+          </Web3Provider>
+        </Web3Providers>
       </body>
     </html>
   );

@@ -6,6 +6,7 @@ import {AgentVaultDeployer} from "./AgentVaultDeployer.sol";
 import {AgentKMDeployer} from "./AgentKMDeployer.sol";
 import {BudgetPolicy} from "./policies/BudgetPolicy.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {LSP6KeyLib} from "./libraries/LSP6KeyLib.sol";
 
 // ─── Lightweight interfaces for post-deployment callbacks ─────────────────────
 
@@ -138,6 +139,22 @@ contract AgentVaultRegistry is Ownable {
         uint256 chainId
     );
 
+    /// @notice Emitted for each agent after permissions are written to ERC725Y storage.
+    event AgentPermissionsConfigured(
+        address indexed vault,
+        address indexed agent,
+        uint8 mode,
+        bytes32 permissions,
+        bytes32 allowedCallsHash
+    );
+
+    /// @notice Per-agent AllowedCalls input: maps agent address to raw LSP6 AllowedCalls bytes.
+    /// @dev Only written to ERC725Y storage when agent does not hold SUPER_CALL.
+    struct AllowedCallsInput {
+        address agent;
+        bytes allowedCalls;
+    }
+
     struct DeployParams {
         uint256 budget;
         BudgetPolicy.Period period;
@@ -145,13 +162,23 @@ contract AgentVaultRegistry is Ownable {
         address budgetToken;
         /// @dev Unix timestamp for expiration; 0 = no expiry
         uint256 expiration;
-        /// @dev Agent addresses to grant CALL + AllowedCalls permissions (max 20)
+        /// @dev Agent addresses to grant permissions (max 20)
         address[] agents;
         /// @dev Individual budgets for each agent (optional; must match agents.length if provided)
         uint256[] agentBudgets;
         /// @dev Initial merchant whitelist (max 100 per batch; triggers MerchantPolicy deployment)
         address[] merchants;
         string label;
+        // ─── Permission profile fields ──────────────────────────────────────
+        /// @dev 0=STRICT_PAYMENTS, 1=SUBSCRIPTIONS, 2=TREASURY_BALANCED, 3=OPS_ADMIN, 4=CUSTOM
+        uint8 agentMode;
+        /// @dev Required to be true when agentMode=CUSTOM with SUPER_* bits, or any mode containing SUPER_*.
+        bool allowSuperPermissions;
+        /// @dev Used only when agentMode=4 (CUSTOM). Caller-provided bitmask.
+        bytes32 customAgentPermissions;
+        /// @dev Per-agent AllowedCalls entries. Required when resolved permissions include CALL (0x800)
+        ///      and do NOT include any SUPER_* bits. Must be non-empty for each agent.
+        AllowedCallsInput[] allowedCallsByAgent;
     }
 
     // ─── Internal helpers ─────────────────────────────────────────────────────
@@ -181,12 +208,51 @@ contract AgentVaultRegistry is Ownable {
 
     // ─── Deployment ───────────────────────────────────────────────────────────
 
-    function deployVault(DeployParams calldata p) external returns (VaultRecord memory record) {
+    /// @dev Validates shared pre-conditions and returns the resolved agent permissions bitmask.
+    function _validateAndResolve(DeployParams calldata p) private pure returns (bytes32 agentPerms) {
         require(p.agents.length <= 20, "Registry: too many agents");
-        if (p.agentBudgets.length > 0) {
-            require(p.agentBudgets.length == p.agents.length, "Registry: agentBudgets length mismatch");
+        require(
+            p.agentBudgets.length == 0 || p.agentBudgets.length == p.agents.length,
+            "Registry: agentBudgets length mismatch"
+        );
+        require(
+            p.allowedCallsByAgent.length == 0 || p.allowedCallsByAgent.length == p.agents.length,
+            "Registry: allowedCallsByAgent length mismatch"
+        );
+
+        // Resolve permissions bitmask from mode
+        agentPerms = _resolveAgentPerms(p);
+
+        // Guardrail: SUPER_* bits require explicit opt-in
+        if (!p.allowSuperPermissions) {
+            require(
+                !LSP6KeyLib.hasSuperBits(agentPerms),
+                "Registry: super permissions disabled"
+            );
         }
 
+        // Enforce AllowedCalls when CALL bit is set without SUPER_CALL
+        if (LSP6KeyLib.hasCall(agentPerms) && !LSP6KeyLib.hasSuperBits(agentPerms)) {
+            require(
+                p.allowedCallsByAgent.length == p.agents.length,
+                "Registry: AllowedCalls required for CALL permission"
+            );
+        }
+    }
+
+    /// @dev Resolves the agent permissions bitmask from the DeployParams mode field.
+    function _resolveAgentPerms(DeployParams calldata p) private pure returns (bytes32) {
+        if (p.agentMode == uint8(LSP6KeyLib.AgentMode.STRICT_PAYMENTS))   return LSP6KeyLib.PERM_STRICT;
+        if (p.agentMode == uint8(LSP6KeyLib.AgentMode.SUBSCRIPTIONS))      return LSP6KeyLib.PERM_SUBSCRIPTIONS;
+        if (p.agentMode == uint8(LSP6KeyLib.AgentMode.TREASURY_BALANCED))  return LSP6KeyLib.PERM_TREASURY;
+        if (p.agentMode == uint8(LSP6KeyLib.AgentMode.OPS_ADMIN))          return LSP6KeyLib.PERM_OPS;
+        // CUSTOM (4): use caller-provided bitmask
+        return p.customAgentPermissions;
+    }
+
+    function deployVault(DeployParams calldata p) external returns (VaultRecord memory record) {
+        _validateAndResolve(p); // validates, reverts on error
+        if (p.merchants.length > 0) require(p.merchants.length <= 100, "Registry: too many merchants");
         record = _deployStack(msg.sender, p);
     }
 
@@ -196,12 +262,58 @@ contract AgentVaultRegistry is Ownable {
     {
         require(authorizedCallers[msg.sender], "Registry: caller not authorized");
         require(owner != address(0), "Registry: zero owner");
-        require(p.agents.length <= 20, "Registry: too many agents");
-        if (p.agentBudgets.length > 0) {
-            require(p.agentBudgets.length == p.agents.length, "Registry: agentBudgets length mismatch");
+        _validateAndResolve(p);
+        if (p.merchants.length > 0) require(p.merchants.length <= 100, "Registry: too many merchants");
+        record = _deployStack(owner, p);
+    }
+
+    function _configureAgentPermissions(
+        IAgentSafe safe,
+        DeployParams calldata p,
+        uint128 apIdx
+    ) private returns (uint128) {
+        bytes32 agentPerms = _resolveAgentPerms(p);
+        bool isSuperMode = LSP6KeyLib.hasSuperBits(agentPerms);
+        bool needsAllowedCalls = LSP6KeyLib.hasCall(agentPerms) && !isSuperMode;
+
+        for (uint256 i = 0; i < p.agents.length; i++) {
+            address agentAddr = p.agents[i];
+
+            // Write permissions bitmap
+            _setDataVerified(
+                safe,
+                LSP6KeyLib.apPermissionsKey(agentAddr),
+                abi.encodePacked(agentPerms)
+            );
+            _appendToAddressPermissionsArray(safe, agentAddr, apIdx++);
+
+            // Write AllowedCalls when required (CALL without SUPER)
+            if (needsAllowedCalls) {
+                bytes memory allowedCalls = p.allowedCallsByAgent[i].allowedCalls;
+                _setDataVerified(
+                    safe,
+                    LSP6KeyLib.apAllowedCallsKey(agentAddr),
+                    allowedCalls
+                );
+                emit AgentPermissionsConfigured(
+                    address(safe),
+                    agentAddr,
+                    p.agentMode,
+                    agentPerms,
+                    keccak256(allowedCalls)
+                );
+            } else {
+                emit AgentPermissionsConfigured(
+                    address(safe),
+                    agentAddr,
+                    p.agentMode,
+                    agentPerms,
+                    bytes32(0)
+                );
+            }
         }
 
-        record = _deployStack(owner, p);
+        return apIdx;
     }
 
     function _deployStack(address owner, DeployParams calldata p)
@@ -265,25 +377,16 @@ contract AgentVaultRegistry is Ownable {
         bytes32 superPerm = bytes32(type(uint256).max);
         _setDataVerified(
             safe,
-            bytes32(abi.encodePacked(LSP6_PERMISSIONS_PREFIX, bytes2(0), bytes20(owner))),
+            LSP6KeyLib.apPermissionsKey(owner),
             abi.encodePacked(superPerm)
         );
         uint128 apIdx = 0;
         _appendToAddressPermissionsArray(safe, owner, apIdx++);
 
-        // 11. Write permissions for each agent (SUPER_CALL 0x400 | SUPER_TRANSFERVALUE 0x100 = 0x500)
-        //     Note: SUPER_CALL bypasses AddressPermissions:AllowedCalls entirely.
-        //     To enforce AllowedCalls, switch to CALL (0x4) and set AllowedCalls per agent.
-        bytes32 agentPerm = bytes32(uint256(0x0000000000000000000000000000000000000000000000000000000000000500));
-        for (uint256 i = 0; i < p.agents.length; i++) {
-            address agentAddr = p.agents[i];
-            _setDataVerified(
-                safe,
-                bytes32(abi.encodePacked(LSP6_PERMISSIONS_PREFIX, bytes2(0), bytes20(agentAddr))),
-                abi.encodePacked(agentPerm)
-            );
-            _appendToAddressPermissionsArray(safe, agentAddr, apIdx++);
-        }
+        // 11. Write permissions + AllowedCalls for each agent based on agentMode.
+        //     SUPER_* bits bypass AllowedCalls enforcement in LSP6. Non-SUPER modes write
+        //     per-agent AllowedCalls to add a second enforcement layer on top of PolicyEngine.
+        apIdx = _configureAgentPermissions(safe, p, apIdx);
 
         // 12. Transfer ownership to user (LSP14 two-step — user calls acceptOwnership() next)
         safe.transferOwnership(owner);

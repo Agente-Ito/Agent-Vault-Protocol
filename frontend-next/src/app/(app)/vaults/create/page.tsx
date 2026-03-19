@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ethers } from 'ethers';
+import { createPublicClient, custom } from 'viem';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/common/Alert';
@@ -12,6 +13,7 @@ import { ProfilePicker } from '@/components/profiles/ProfilePicker';
 import { useWeb3 } from '@/context/Web3Context';
 import { useI18n } from '@/context/I18nContext';
 import { cn } from '@/lib/utils/cn';
+import { verifyPermissionsWrite } from '@/lib/verifyWrite';
 import {
   getBaseTokenOptions,
   getBaseVaultFactoryContract,
@@ -49,6 +51,45 @@ function getErrorMessage(error: unknown) {
     if (typeof e.message === 'string' && e.message) return e.message;
   }
   return String(error);
+}
+
+const AgentMode = {
+  STRICT_PAYMENTS: 0,
+  SUBSCRIPTIONS: 1,
+  TREASURY_BALANCED: 2,
+  OPS_ADMIN: 3,
+  CUSTOM: 4,
+} as const;
+
+const PERM_STRICT_PAYMENTS = '0x0000000000000000000000000000000000000000000000000000000000000A00';
+const PERM_SUBSCRIPTIONS = '0x0000000000000000000000000000000000000000000000000000000000400A00';
+const PERM_TREASURY_BALANCED = '0x0000000000000000000000000000000000000000000000000000000000002A00';
+const PERM_OPS_ADMIN = '0x0000000000000000000000000000000000000000000000000000000000040000';
+const PERM_POWER_USER = '0x0000000000000000000000000000000000000000000000000000000000000500';
+
+const ANY_STANDARD_ID = 'ffffffff';
+const ANY_FUNCTION_SIG = 'ffffffff';
+const ALLOWED_CALL_TYPE_CALL_AND_VALUE = 3;
+
+function encodeAllowedCallsForTargets(targets: string[]): string {
+  if (targets.length === 0) return '0x';
+  const entries = targets.map((addr) => {
+    const normalized = ethers.getAddress(addr).slice(2).toLowerCase();
+    return `0020${ALLOWED_CALL_TYPE_CALL_AND_VALUE.toString(16).padStart(8, '0')}${normalized}${ANY_STANDARD_ID}${ANY_FUNCTION_SIG}`;
+  });
+  return `0x${entries.join('')}`;
+}
+
+function permissionHexForMode(agentMode: number): string {
+  if (agentMode === AgentMode.STRICT_PAYMENTS) return PERM_STRICT_PAYMENTS;
+  if (agentMode === AgentMode.SUBSCRIPTIONS) return PERM_SUBSCRIPTIONS;
+  if (agentMode === AgentMode.TREASURY_BALANCED) return PERM_TREASURY_BALANCED;
+  if (agentMode === AgentMode.OPS_ADMIN) return PERM_OPS_ADMIN;
+  return PERM_POWER_USER;
+}
+
+interface Eip1193ProviderLike {
+  request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
 }
 
 // ─── Template data (display strings via t(), only config values here) ─────────
@@ -125,12 +166,14 @@ function PreviewRow({ icon, label, value, active }: { icon: string; label: strin
 
 function VaultPreview({
   vaultLabel, budget, period, hasExpiry, expiryDate, agentCount, merchantCount,
-  chain, tokenSymbol,
+  chain, tokenSymbol, securityLabel, securityRisk,
 }: {
   vaultLabel: string; budget: string; period: string;
   hasExpiry: boolean; expiryDate: string;
   agentCount: number; merchantCount: number;
   chain: 'lukso' | 'base'; tokenSymbol: string;
+  securityLabel: string;
+  securityRisk: 'low' | 'medium' | 'high';
 }) {
   const budgetNum = parseFloat(budget) || 0;
   return (
@@ -155,6 +198,7 @@ function VaultPreview({
         <PreviewRow icon="💰" label="Budget"    value={budgetNum > 0 ? `${budget} ${tokenSymbol}` : '—'}     active={budgetNum > 0} />
         <PreviewRow icon="📅" label="Period"    value={PERIOD_MAP[period] ?? '—'}                            active={true} />
         <PreviewRow icon="⏱️" label="Expires"   value={hasExpiry && expiryDate ? new Date(expiryDate).toLocaleDateString() : 'No expiry'} active={hasExpiry && !!expiryDate} />
+        <PreviewRow icon="🛡️" label="Security" value={`${securityLabel}${securityRisk === 'high' ? ' (High Risk)' : ''}`} active={true} />
         <PreviewRow icon="🏪" label="Merchants" value={merchantCount > 0 ? `${merchantCount} address(es)` : 'Any'} active={merchantCount > 0} />
         <PreviewRow icon="🤖" label="Agents"    value={agentCount > 0 ? `${agentCount} agent(s)` : 'None yet'} active={agentCount > 0} />
       </div>
@@ -203,6 +247,9 @@ export default function CreateVaultPage() {
   const [step, setStep]                           = useState(1);
   const [activeTemplate, setActiveTemplate]       = useState<string | null>(null);
   const [stepTouched, setStepTouched]             = useState<Record<number, boolean>>({});
+  const [agentMode, setAgentMode]                 = useState<number>(AgentMode.STRICT_PAYMENTS);
+  const [allowSuperPermissions, setAllowSuperPermissions] = useState(false);
+  const [showPowerUserWarning, setShowPowerUserWarning] = useState(false);
 
   // Picker modal
   const [pickerOpen, setPickerOpen]               = useState<'agents' | 'merchants' | null>(null);
@@ -210,6 +257,13 @@ export default function CreateVaultPage() {
   // Derived
   const rawAgentList   = agents.split(',').map((a) => a.trim()).filter(Boolean);
   const merchantCount  = merchants.split(',').map((m) => m.trim()).filter(Boolean).length;
+  const securityLabel =
+    agentMode === AgentMode.STRICT_PAYMENTS ? 'Strict Payments' :
+    agentMode === AgentMode.SUBSCRIPTIONS ? 'Subscriptions' :
+    agentMode === AgentMode.TREASURY_BALANCED ? 'Treasury Balanced' :
+    agentMode === AgentMode.OPS_ADMIN ? 'Ops Admin' :
+    'Power User';
+  const securityRisk: 'low' | 'medium' | 'high' = agentMode === AgentMode.CUSTOM ? 'high' : 'low';
 
   // Validation
   const labelError  = stepTouched[1] && label.trim().length < 2  ? 'Vault name must be at least 2 characters.' : null;
@@ -219,7 +273,7 @@ export default function CreateVaultPage() {
   const step1Valid = label.trim().length >= 2 && !!budget && parseFloat(budget) > 0;
   const step2Valid = !hasExpiry || !!expiryDate;
 
-  const stepLabels = [t('create.step1.title'), t('create.step2.title'), t('create.step3.title')];
+  const stepLabels = [t('create.step1.title'), t('create.step2.title'), 'Security', t('create.step3.title')];
 
   const applyTemplate = (cfg: TemplateConfig) => {
     setBudget(cfg.budget);
@@ -230,6 +284,8 @@ export default function CreateVaultPage() {
     setMerchants(cfg.merchants);
     setUsePerAgentBudgets(false);
     setAgentBudgetMap({});
+    setAgentMode(AgentMode.STRICT_PAYMENTS);
+    setAllowSuperPermissions(false);
     setActiveTemplate(cfg.id);
     setStepTouched({});
     setStep(1);
@@ -260,6 +316,10 @@ export default function CreateVaultPage() {
   const handleStep2Next = () => {
     setStepTouched((p) => ({ ...p, 2: true }));
     if (step2Valid) setStep(3);
+  };
+
+  const handleStep3Next = () => {
+    setStep(4);
   };
 
   const onSubmitBase = async (e: React.FormEvent) => {
@@ -386,6 +446,18 @@ export default function CreateVaultPage() {
             })
           : [];
 
+      const modeNeedsAllowedCalls =
+        agentMode === AgentMode.STRICT_PAYMENTS ||
+        agentMode === AgentMode.SUBSCRIPTIONS ||
+        agentMode === AgentMode.TREASURY_BALANCED;
+      const shouldWriteAllowedCalls = modeNeedsAllowedCalls && !allowSuperPermissions;
+      const encodedAllowedCalls = encodeAllowedCallsForTargets(merchantList);
+      const allowedCallsByAgent = shouldWriteAllowedCalls
+        ? agentList.map((address) => ({ agent: address, allowedCalls: encodedAllowedCalls }))
+        : [];
+      const customAgentPermissions =
+        agentMode === AgentMode.CUSTOM ? PERM_POWER_USER : ethers.ZeroHash;
+
       setStatus('Sending transaction…');
       const tx = await registry.deployVault({
         budget: ethers.parseEther(budget),
@@ -396,6 +468,10 @@ export default function CreateVaultPage() {
         agentBudgets: agentBudgetsList,
         merchants: merchantList,
         label,
+        agentMode,
+        allowSuperPermissions,
+        customAgentPermissions,
+        allowedCallsByAgent,
       });
 
       setStatus('Waiting for confirmation…');
@@ -426,6 +502,28 @@ export default function CreateVaultPage() {
       if (!safeAddr) {
         setStatus(`Vault deployed (tx: ${receipt.hash}), but deployed addresses could not be recovered. Check the explorer or refresh your vault list.`);
       } else {
+        try {
+          const ethereumProvider = (window as unknown as { ethereum?: Eip1193ProviderLike }).ethereum;
+          if (!ethereumProvider) {
+            throw new Error('Wallet provider is unavailable for post-deploy verification.');
+          }
+          const client = createPublicClient({ transport: custom(ethereumProvider) });
+          const expectedPermissions = permissionHexForMode(agentMode);
+          const verifyRows = await verifyPermissionsWrite(client, safeAddr as `0x${string}`, agentList.map((address) => ({
+            address,
+            mode: agentMode,
+            expectedPermissions,
+            expectedAllowedCalls: shouldWriteAllowedCalls ? encodedAllowedCalls : '0x',
+          })));
+          const failed = verifyRows.filter((r) => !r.permissionsMatch || !r.allowedCallsMatch);
+          if (failed.length > 0) {
+            throw new Error('On-chain permission verification failed after deployment.');
+          }
+        } catch (verifyErr: unknown) {
+          setStatus('Error: ' + getErrorMessage(verifyErr));
+          return;
+        }
+
         setDeployed({ safe: safeAddr, keyManager: kmAddr, policyEngine: peAddr });
         setStatus('Vault deployed!');
       }
@@ -748,7 +846,7 @@ export default function CreateVaultPage() {
                         Skip
                       </Button>
                       <Button type="button" variant="primary" onClick={handleStep2Next}>
-                        {t('create.btn.next_agents')}
+                        Next: Security
                       </Button>
                     </div>
                   </div>
@@ -757,8 +855,108 @@ export default function CreateVaultPage() {
             </Card>
           )}
 
-          {/* ── Step 3: Agents ──────────────────────────────────────────────── */}
+          {/* ── Step 3: Security profile ─────────────────────────────────────── */}
           {step === 3 && (
+            <Card>
+              <CardHeader><CardTitle>Security Profile</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-md">
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                    Choose how much authority each agent gets. Default profile is strict and does not use SUPER permissions.
+                  </p>
+
+                  <div className="grid sm:grid-cols-2 gap-sm">
+                    <button
+                      type="button"
+                      onClick={() => { setAgentMode(AgentMode.STRICT_PAYMENTS); setAllowSuperPermissions(false); }}
+                      className={cn('p-4 rounded-xl border-2 text-left', agentMode === AgentMode.STRICT_PAYMENTS ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-neutral-200 dark:border-neutral-700')}
+                    >
+                      <p className="font-semibold text-sm">Strict Payments</p>
+                      <p className="text-xs text-neutral-500">CALL + TRANSFERVALUE with AllowedCalls enforcement.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setAgentMode(AgentMode.SUBSCRIPTIONS); setAllowSuperPermissions(false); }}
+                      className={cn('p-4 rounded-xl border-2 text-left', agentMode === AgentMode.SUBSCRIPTIONS ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-neutral-200 dark:border-neutral-700')}
+                    >
+                      <p className="font-semibold text-sm">Subscriptions</p>
+                      <p className="text-xs text-neutral-500">Strict Payments + relay execution.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setAgentMode(AgentMode.TREASURY_BALANCED); setAllowSuperPermissions(false); }}
+                      className={cn('p-4 rounded-xl border-2 text-left', agentMode === AgentMode.TREASURY_BALANCED ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20' : 'border-neutral-200 dark:border-neutral-700')}
+                    >
+                      <p className="font-semibold text-sm">Treasury Balanced</p>
+                      <p className="text-xs text-neutral-500">Strict Payments + STATICCALL for read-heavy workflows.</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setAgentMode(AgentMode.OPS_ADMIN); setAllowSuperPermissions(false); }}
+                      className={cn('p-4 rounded-xl border-2 text-left', agentMode === AgentMode.OPS_ADMIN ? 'border-slate-500 bg-slate-50 dark:bg-slate-900/20' : 'border-neutral-200 dark:border-neutral-700')}
+                    >
+                      <p className="font-semibold text-sm">Ops Admin</p>
+                      <p className="text-xs text-neutral-500">SETDATA only, no value transfer.</p>
+                    </button>
+                  </div>
+
+                  <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-900 p-3">
+                    <label className="flex items-center justify-between gap-sm">
+                      <span className="text-sm font-medium text-red-700 dark:text-red-300">Enable Power User (SUPER permissions)</span>
+                      <input
+                        type="checkbox"
+                        checked={agentMode === AgentMode.CUSTOM && allowSuperPermissions}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setShowPowerUserWarning(true);
+                          } else {
+                            setAllowSuperPermissions(false);
+                            setAgentMode(AgentMode.STRICT_PAYMENTS);
+                          }
+                        }}
+                      />
+                    </label>
+                    <p className="text-xs text-red-600 dark:text-red-300 mt-1">
+                      SUPER_CALL bypasses AllowedCalls. Use only for advanced enterprise scenarios.
+                    </p>
+                  </div>
+
+                  {showPowerUserWarning && (
+                    <Alert variant="warning">
+                      <AlertTitle>High-Risk Permission</AlertTitle>
+                      <AlertDescription>
+                        Power User mode enables SUPER permissions and bypasses AllowedCalls restrictions.
+                        <div className="mt-2 flex gap-2">
+                          <Button type="button" variant="secondary" onClick={() => setShowPowerUserWarning(false)}>Cancel</Button>
+                          <Button
+                            type="button"
+                            variant="primary"
+                            onClick={() => {
+                              setAgentMode(AgentMode.CUSTOM);
+                              setAllowSuperPermissions(true);
+                              setShowPowerUserWarning(false);
+                            }}
+                          >
+                            I Understand, Enable
+                          </Button>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="flex justify-between pt-sm">
+                    <Button type="button" variant="secondary" onClick={() => setStep(2)}>Back</Button>
+                    <Button type="button" variant="primary" onClick={handleStep3Next}>
+                      Next: Agents
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── Step 4: Agents ──────────────────────────────────────────────── */}
+          {step === 4 && (
             <form onSubmit={onSubmit}>
               <Card>
                 <CardHeader><CardTitle>{t('create.step3.title')}</CardTitle></CardHeader>
@@ -831,7 +1029,7 @@ export default function CreateVaultPage() {
                     )}
 
                     <div className="flex justify-between pt-sm">
-                      <Button type="button" variant="secondary" onClick={() => setStep(2)}>Back</Button>
+                      <Button type="button" variant="secondary" onClick={() => setStep(3)}>Back</Button>
                       <div className="flex gap-sm">
                         {agents.trim() === '' && (
                           <Button type="submit" variant="secondary" disabled={loading || !isConnected || !isRegistryConfigured}>
@@ -868,6 +1066,8 @@ export default function CreateVaultPage() {
             merchantCount={merchantCount}
             chain={chain}
             tokenSymbol={chain === 'base' ? selectedToken.symbol : 'LYX'}
+            securityLabel={securityLabel}
+            securityRisk={securityRisk}
           />
         </div>
       </div>

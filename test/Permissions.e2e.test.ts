@@ -29,7 +29,11 @@ import {
   decodePermissions,
   decodeControllerAddress,
   SUPER_PERM,
-  AGENT_PERM,
+  PERM_STRICT_PAYMENTS,
+  PERM_POWER_USER,
+  AgentMode,
+  hasSuperBits,
+  encodeAllowedCalls,
 } from "../scripts/lsp6Keys";
 
 describe("Permissions — E2E storage + execution", function () {
@@ -72,6 +76,11 @@ describe("Permissions — E2E storage + execution", function () {
       agentBudgets: [],
       merchants:   [merchant.address],
       label:       "E2E Test Vault",
+      // STRICT_PAYMENTS: no SUPER_* bits; AllowedCalls enforced by LSP6 KeyManager
+      agentMode:              AgentMode.STRICT_PAYMENTS,
+      allowSuperPermissions:  false,
+      customAgentPermissions: ethers.ZeroHash,
+      allowedCallsByAgent:    [{ agent: agent.address, allowedCalls: encodeAllowedCalls([merchant.address]) }],
     });
     const receipt = await tx.wait();
 
@@ -123,10 +132,10 @@ describe("Permissions — E2E storage + execution", function () {
       expect(decodePermissions(raw)).to.equal(BigInt(SUPER_PERM));
     });
 
-    it("AddressPermissions:Permissions:<agent> = AGENT_PERM (0x500)", async function () {
+    it("AddressPermissions:Permissions:<agent> = PERM_STRICT_PAYMENTS (0xA00)", async function () {
       const { safe } = await deployVaultFull();
       const raw = await safe.getData(apPermissionsKey(agent.address));
-      expect(decodePermissions(raw)).to.equal(BigInt(AGENT_PERM));
+      expect(decodePermissions(raw)).to.equal(BigInt(PERM_STRICT_PAYMENTS));
     });
 
     it("AddressPermissions:Permissions:<stranger> = 0 (no permissions)", async function () {
@@ -141,6 +150,11 @@ describe("Permissions — E2E storage + execution", function () {
         budget: BUDGET, period: 1, budgetToken: ethers.ZeroAddress,
         expiration: 0, agents: [agent.address, extra],
         agentBudgets: [], merchants: [], label: "Multi-agent vault",
+        // OPS_ADMIN: SETDATA only, no AllowedCalls requirement
+        agentMode: AgentMode.OPS_ADMIN,
+        allowSuperPermissions: false,
+        customAgentPermissions: ethers.ZeroHash,
+        allowedCallsByAgent: [],
       });
       const receipt = await tx.wait();
       const event = receipt!.logs
@@ -234,29 +248,61 @@ describe("Permissions — E2E storage + execution", function () {
     });
   });
 
-  // ─── P0.3: AllowedCalls bypass documentation ──────────────────────────────
+  // ─── Permission mode tests ──────────────────────────────────────────────────
 
-  describe("AllowedCalls — documented SUPER_CALL bypass", function () {
-    it("SUPER_CALL (0x400) bypasses AllowedCalls list — key is stored but not enforced", async function () {
-      // This test documents the known architectural trade-off:
-      // Agents have SUPER_CALL (0x400) which bypasses AddressPermissions:AllowedCalls.
-      // AllowedCalls enforcement requires switching to CALL (0x4) without SUPER_CALL.
+  describe("Permission modes — AllowedCalls enforcement", function () {
+    it("STRICT_PAYMENTS: no SUPER_* bits, AllowedCalls key written with merchant", async function () {
       const { safe } = await deployVaultFull();
 
-      // AllowedCalls key exists but is EMPTY (never set by deployStack)
-      const allowedCallsKey = apAllowedCallsKey(agent.address);
-      const allowedCallsRaw = await safe.getData(allowedCallsKey);
-      expect(allowedCallsRaw).to.equal("0x",
-        "AllowedCalls is empty — enforcement is bypassed by SUPER_CALL. " +
-        "To enforce AllowedCalls: switch AGENT_PERM from 0x500 (SUPER_CALL|SUPER_TRANSFERVALUE) " +
-        "to 0x4 (CALL only) and set AllowedCalls list explicitly."
-      );
-
-      // Agent permission bitmap confirms SUPER_CALL bit (0x400) is set
       const permRaw = await safe.getData(apPermissionsKey(agent.address));
       const perm = decodePermissions(permRaw);
-      expect(perm & 0x400n).to.equal(0x400n, "SUPER_CALL bit 0x400 is set in AGENT_PERM");
-      expect(perm & 0x4n).to.equal(0n, "CALL bit 0x4 is NOT set (only SUPER_CALL)");
+
+      // No SUPER bits — AllowedCalls is enforced by LSP6 KeyManager
+      expect(hasSuperBits(perm)).to.be.false;
+      // CALL bit (0x800) set
+      expect(perm & 0x800n).to.equal(0x800n);
+      // AllowedCalls key is non-empty
+      const acRaw = await safe.getData(apAllowedCallsKey(agent.address));
+      expect(acRaw).to.not.equal("0x", "AllowedCalls must be written for STRICT_PAYMENTS mode");
+      expect(acRaw.length).to.be.greaterThan(2);
+    });
+
+    it("POWER_USER (CUSTOM + allowSuperPermissions=true): SUPER_* bits set, AllowedCalls empty", async function () {
+      const tx = await registry.connect(owner).deployVault({
+        budget: BUDGET, period: 1, budgetToken: ethers.ZeroAddress, expiration: 0,
+        agents: [agent.address], agentBudgets: [], merchants: [merchant.address],
+        label: "Power User Vault",
+        agentMode:              AgentMode.CUSTOM,
+        allowSuperPermissions:  true,
+        customAgentPermissions: PERM_POWER_USER as `0x${string}`,
+        allowedCallsByAgent:    [],
+      });
+      const receipt = await tx.wait();
+      const event = receipt!.logs
+        .map((log) => { try { return registry.interface.parseLog(log as any); } catch { return null; } })
+        .find((e) => e?.name === "VaultDeployed");
+      const safe = await ethers.getContractAt("AgentSafe", event!.args.safe) as AgentSafe;
+
+      const perm = decodePermissions(await safe.getData(apPermissionsKey(agent.address)));
+      // SUPER bits must be present
+      expect(hasSuperBits(perm)).to.be.true;
+      // AllowedCalls NOT written when SUPER bits set
+      const acRaw = await safe.getData(apAllowedCallsKey(agent.address));
+      expect(acRaw).to.equal("0x", "AllowedCalls must be empty when SUPER_* bits are present");
+    });
+
+    it("CUSTOM super bits without allowSuperPermissions=true reverts", async function () {
+      await expect(
+        registry.connect(owner).deployVault({
+          budget: BUDGET, period: 1, budgetToken: ethers.ZeroAddress, expiration: 0,
+          agents: [agent.address], agentBudgets: [], merchants: [merchant.address],
+          label: "Sneaky Vault",
+          agentMode:              AgentMode.CUSTOM,
+          allowSuperPermissions:  false,
+          customAgentPermissions: PERM_POWER_USER as `0x${string}`,
+          allowedCallsByAgent:    [],
+        })
+      ).to.be.revertedWith("Registry: super permissions disabled");
     });
   });
 });

@@ -17,11 +17,21 @@ import {
   apAllowedCallsKey,
   encodeAllowedCall,
   encodeAllowedCallsValue,
+  encodeAllowedCalls,
   decodeArrayLength,
   decodePermissions,
   decodeControllerAddress,
   SUPER_PERM,
   AGENT_PERM,
+  PERM_STRICT_PAYMENTS,
+  PERM_SUBSCRIPTIONS,
+  PERM_TREASURY_BALANCED,
+  PERM_OPS_ADMIN,
+  PERM_POWER_USER,
+  SUPER_MASK,
+  AgentMode,
+  hasSuperBits,
+  hasCall,
   ALLOWED_CALL_TYPES,
   ANY_STANDARD_ID,
   ANY_FUNCTION_SIG,
@@ -254,5 +264,123 @@ describe("lsp6Keys — fixed-vector key derivation unit tests", function () {
     const trailing = key.slice(-32).toLowerCase();
     // uint128(42) big-endian in 16 bytes = 30 zero hex chars + "2a" = 32 chars total
     expect(trailing).to.equal("000000000000000000000000000000" + "2a");
+  });
+
+  // ─── Permission preset constants (tiered security profiles) ─────────────────────
+
+  it("PERM_STRICT_PAYMENTS = 0x...0A00 (CALL | TRANSFERVALUE)", function () {
+    expect(PERM_STRICT_PAYMENTS.toLowerCase()).to.equal(
+      "0x" + "00".repeat(30) + "0a00"
+    );
+  });
+
+  it("PERM_SUBSCRIPTIONS = 0x...400A00 (STRICT + EXECUTE_RELAY_CALL)", function () {
+    expect(PERM_SUBSCRIPTIONS.toLowerCase()).to.equal(
+      "0x" + "00".repeat(29) + "400a00"
+    );
+  });
+
+  it("PERM_TREASURY_BALANCED = 0x...2A00 (CALL | TRANSFERVALUE | STATICCALL)", function () {
+    expect(PERM_TREASURY_BALANCED.toLowerCase()).to.equal(
+      "0x" + "00".repeat(30) + "2a00"
+    );
+  });
+
+  it("PERM_OPS_ADMIN = 0x...40000 (SETDATA only)", function () {
+    expect(PERM_OPS_ADMIN.toLowerCase()).to.equal(
+      "0x" + "00".repeat(29) + "040000"
+    );
+  });
+
+  it("PERM_POWER_USER = AGENT_PERM = 0x...0500 (SUPER_CALL | SUPER_TRANSFERVALUE)", function () {
+    expect(PERM_POWER_USER.toLowerCase()).to.equal(AGENT_PERM.toLowerCase());
+    expect(PERM_POWER_USER.toLowerCase()).to.equal(
+      "0x" + "00".repeat(30) + "0500"
+    );
+  });
+
+  it("SUPER_MASK = 0x25500 (all SUPER_* bits)", function () {
+    expect(SUPER_MASK).to.equal(0x25500n);
+  });
+
+  // ─── AgentMode enum values ────────────────────────────────────────────────
+
+  it("AgentMode.STRICT_PAYMENTS = 0", function () { expect(AgentMode.STRICT_PAYMENTS).to.equal(0); });
+  it("AgentMode.SUBSCRIPTIONS = 1",   function () { expect(AgentMode.SUBSCRIPTIONS).to.equal(1); });
+  it("AgentMode.TREASURY_BALANCED = 2", function () { expect(AgentMode.TREASURY_BALANCED).to.equal(2); });
+  it("AgentMode.OPS_ADMIN = 3",        function () { expect(AgentMode.OPS_ADMIN).to.equal(3); });
+  it("AgentMode.CUSTOM = 4",           function () { expect(AgentMode.CUSTOM).to.equal(4); });
+
+  // ─── hasSuperBits ─────────────────────────────────────────────────────────
+
+  it("hasSuperBits(0x500n) = true (SUPER_CALL | SUPER_TRANSFERVALUE)", function () {
+    expect(hasSuperBits(0x500n)).to.be.true;
+  });
+  it("hasSuperBits(0x100n) = true (SUPER_TRANSFERVALUE only)", function () {
+    expect(hasSuperBits(0x100n)).to.be.true;
+  });
+  it("hasSuperBits(0x400n) = true (SUPER_CALL only)", function () {
+    expect(hasSuperBits(0x400n)).to.be.true;
+  });
+  it("hasSuperBits(0x20000n) = true (SUPER_SETDATA)", function () {
+    expect(hasSuperBits(0x20000n)).to.be.true;
+  });
+  it("hasSuperBits(0xA00n) = false (STRICT_PAYMENTS mode)", function () {
+    expect(hasSuperBits(0xA00n)).to.be.false;
+  });
+  it("hasSuperBits(0x2A00n) = false (TREASURY_BALANCED mode)", function () {
+    expect(hasSuperBits(0x2A00n)).to.be.false;
+  });
+  it("hasSuperBits(0n) = false (no bits set)", function () {
+    expect(hasSuperBits(0n)).to.be.false;
+  });
+
+  // ─── hasCall ───────────────────────────────────────────────────────────────
+
+  it("hasCall(0x800n) = true (CALL bit set)", function () {
+    expect(hasCall(0x800n)).to.be.true;
+  });
+  it("hasCall(0xA00n) = true (STRICT_PAYMENTS = CALL | TRANSFERVALUE)", function () {
+    expect(hasCall(0xA00n)).to.be.true;
+  });
+  it("hasCall(0x200n) = false (TRANSFERVALUE only, no CALL)", function () {
+    expect(hasCall(0x200n)).to.be.false;
+  });
+  it("hasCall(0x40000n) = false (SETDATA only)", function () {
+    expect(hasCall(0x40000n)).to.be.false;
+  });
+  it("hasCall(0n) = false", function () {
+    expect(hasCall(0n)).to.be.false;
+  });
+
+  // ─── encodeAllowedCalls convenience helper ──────────────────────────────────
+
+  it("encodeAllowedCalls([]) = '0x'", function () {
+    expect(encodeAllowedCalls([])).to.equal("0x");
+  });
+
+  it("encodeAllowedCalls([addr]) matches manual encodeAllowedCallsValue (default callType=3)", function () {
+    const manual = encodeAllowedCallsValue(
+      encodeAllowedCall(
+        ALLOWED_CALL_TYPES.CALL | ALLOWED_CALL_TYPES.TRANSFERVALUE,
+        ADDR_A,
+        ANY_STANDARD_ID,
+        ANY_FUNCTION_SIG,
+      )
+    );
+    expect(encodeAllowedCalls([ADDR_A])).to.equal(manual);
+  });
+
+  it("encodeAllowedCalls([addr1, addr2]) produces 2-entry CompactBytesArray", function () {
+    const result = encodeAllowedCalls([ADDR_A, ADDR_B]);
+    // 2 entries × 34 bytes each = 68 bytes; "0x" prefix + 68 × 2 = 138 chars
+    expect(result.length).to.equal(2 + 68 + 68);
+  });
+
+  it("encodeAllowedCalls with explicit callType=STATICCALL uses 0x4", function () {
+    const result = encodeAllowedCalls([ADDR_A], ALLOWED_CALL_TYPES.STATICCALL);
+    // entry bytes 4-11 (after the 0020 length prefix) = call type = "00000004"
+    const entryPart = result.slice(2); // strip "0x"
+    expect(entryPart.slice(4, 12)).to.equal("00000004");
   });
 });

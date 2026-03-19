@@ -455,6 +455,10 @@ export function OnboardingModal() {
         agentBudgets: [],
         merchants: [],
         label: displayName,
+        agentMode: 0,
+        allowSuperPermissions: false,
+        customAgentPermissions: ethers.ZeroHash,
+        allowedCallsByAgent: [],
       });
       await tx.wait();
       finish();

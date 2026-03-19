@@ -14,6 +14,10 @@ export type RegistryContract = Contract & {
     agentBudgets: bigint[];
     merchants: string[];
     label: string;
+    agentMode: number;
+    allowSuperPermissions: boolean;
+    customAgentPermissions: string;
+    allowedCallsByAgent: Array<{ agent: string; allowedCalls: string }>;
   }): Promise<ContractTransactionResponse>;
   getVaults(owner: string): Promise<Array<{ safe: string; keyManager: string; policyEngine: string; label: string }>>;
   getKeyManager(safe: string): Promise<string>;
@@ -48,7 +52,7 @@ const RegistryAbi = [
   'function getVaults(address owner) external view returns (tuple(address safe,address keyManager,address policyEngine,string label)[])',
   'function getKeyManager(address safe) external view returns (address)',
   'function getPolicyEngine(address safe) external view returns (address)',
-  'function deployVault(tuple(uint256 budget,uint8 period,address budgetToken,uint256 expiration,address[] agents,uint256[] agentBudgets,address[] merchants,string label) p) external returns (tuple(address safe,address keyManager,address policyEngine,string label))',
+  'function deployVault(tuple(uint256 budget,uint8 period,address budgetToken,uint256 expiration,address[] agents,uint256[] agentBudgets,address[] merchants,string label,uint8 agentMode,bool allowSuperPermissions,bytes32 customAgentPermissions,tuple(address agent,bytes allowedCalls)[] allowedCallsByAgent) p) external returns (tuple(address safe,address keyManager,address policyEngine,string label))',
   'event VaultDeployed(address indexed owner,address indexed safe,address indexed keyManager,address policyEngine,string label,uint256 chainId)',
 ];
 

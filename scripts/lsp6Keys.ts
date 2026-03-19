@@ -36,9 +36,63 @@ const AP_PERMISSIONS_PREFIX = "4b80742de2bf82acb363";
 export const SUPER_PERM =
   "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
-/** SUPER_CALL (0x400) | SUPER_TRANSFERVALUE (0x100) — used for agent controllers. */
+/**
+ * @deprecated Alias for PERM_POWER_USER. Kept for backward compatibility.
+ * SUPER_CALL (0x400) | SUPER_TRANSFERVALUE (0x100) = 0x500 — bypasses AllowedCalls.
+ */
 export const AGENT_PERM =
   "0x0000000000000000000000000000000000000000000000000000000000000500";
+
+// ─── Permission preset bitmasks (LSP6 official bit values) ────────────────────
+// Reference: https://github.com/lukso-network/LIPs/blob/main/LSPs/LSP-6-KeyManager.md
+// TRANSFERVALUE=0x200, CALL=0x800, STATICCALL=0x2000, SETDATA=0x40000
+// EXECUTE_RELAY_CALL=0x400000
+// SUPER_TRANSFERVALUE=0x100, SUPER_CALL=0x400
+
+/** STRICT_PAYMENTS: CALL (0x800) | TRANSFERVALUE (0x200) = 0xA00. AllowedCalls enforced. */
+export const PERM_STRICT_PAYMENTS =
+  "0x0000000000000000000000000000000000000000000000000000000000000A00";
+
+/** SUBSCRIPTIONS: STRICT + EXECUTE_RELAY_CALL (0x400000) = 0x400A00. AllowedCalls enforced. */
+export const PERM_SUBSCRIPTIONS =
+  "0x0000000000000000000000000000000000000000000000000000000000400A00";
+
+/** TREASURY_BALANCED: CALL | TRANSFERVALUE | STATICCALL (0x2000) = 0x2A00. AllowedCalls enforced. */
+export const PERM_TREASURY_BALANCED =
+  "0x0000000000000000000000000000000000000000000000000000000000002A00";
+
+/** OPS_ADMIN: SETDATA (0x40000) only. No value transfer. No AllowedCalls required. */
+export const PERM_OPS_ADMIN =
+  "0x0000000000000000000000000000000000000000000000000000000000040000";
+
+/** POWER_USER: SUPER_CALL | SUPER_TRANSFERVALUE = 0x500. Bypasses AllowedCalls. */
+export const PERM_POWER_USER = AGENT_PERM;
+
+/**
+ * Combined mask for all SUPER_* permission bits:
+ * SUPER_TRANSFERVALUE (0x100) | SUPER_CALL (0x400) | SUPER_STATICCALL (0x1000) |
+ * SUPER_DELEGATECALL (0x4000) | SUPER_SETDATA (0x20000) = 0x25500
+ */
+export const SUPER_MASK = 0x25500n;
+
+/** Agent permission mode identifiers (mirrors LSP6KeyLib.AgentMode enum). */
+export const AgentMode = {
+  STRICT_PAYMENTS:   0,
+  SUBSCRIPTIONS:     1,
+  TREASURY_BALANCED: 2,
+  OPS_ADMIN:         3,
+  CUSTOM:            4,
+} as const;
+
+/** Returns true if the given permission bitmap contains any SUPER_* bit. */
+export function hasSuperBits(perm: bigint): boolean {
+  return (perm & SUPER_MASK) !== 0n;
+}
+
+/** Returns true if the given permission bitmap contains the CALL bit (0x800). */
+export function hasCall(perm: bigint): boolean {
+  return (perm & 0x800n) !== 0n;
+}
 
 // ─── Key derivation ───────────────────────────────────────────────────────────
 
@@ -124,7 +178,7 @@ export function decodeControllerAddress(rawBytes: string): string {
  * Source: _LSP6KEY_ADDRESSPERMISSIONS_ALLOWEDCALLS_PREFIX in LSP6Constants.sol
  *
  * ⚠️  SUPER_CALL (bit 0x400) bypasses AllowedCalls entirely.
- *     To enforce AllowedCalls, controllers must hold CALL (0x4) WITHOUT SUPER_CALL.
+ *     To enforce AllowedCalls, controllers must hold CALL (0x800) WITHOUT SUPER_CALL.
  *     Current AGENT_PERM (0x500 = SUPER_CALL | SUPER_TRANSFERVALUE) bypasses this list.
  */
 export const AP_ALLOWED_CALLS_PREFIX = "4b80742de2bf393a64c7";
@@ -193,6 +247,27 @@ export function encodeAllowedCall(
  */
 export function encodeAllowedCallsValue(...entries: string[]): string {
   return "0x" + entries.join("");
+}
+
+/**
+ * Convenience helper: encodes a list of target addresses into a complete AllowedCalls value.
+ *
+ * Uses CALL (0x00000002) | TRANSFERVALUE (0x00000001) = 0x00000003 as the default call type,
+ * which allows both value transfers and contract calls to the listed targets.
+ *
+ * @param targets    Array of allowed target addresses
+ * @param callType   Optional call type override (default: CALL | TRANSFERVALUE = 3)
+ * @returns          "0x"-prefixed CompactBytesArray ready for setData(apAllowedCallsKey(agent))
+ */
+export function encodeAllowedCalls(
+  targets: string[],
+  callType: number = ALLOWED_CALL_TYPES.CALL | ALLOWED_CALL_TYPES.TRANSFERVALUE,
+): string {
+  if (targets.length === 0) return "0x";
+  const entries = targets.map((addr) =>
+    encodeAllowedCall(callType, addr, ANY_STANDARD_ID, ANY_FUNCTION_SIG)
+  );
+  return encodeAllowedCallsValue(...entries);
 }
 
 // ─── Post-write verification ──────────────────────────────────────────────────

@@ -53,6 +53,9 @@ const REASON_MAP: Record<string, string> = {
   'Registry: too many merchants':        'Too many merchants (maximum 100 per batch)',
   'Registry: caller not authorized':     'Caller is not authorized to deploy vaults on behalf of others',
   'Registry: expiration in the past':    'Expiration timestamp must be in the future',
+  'Registry: super permissions disabled':           'SUPER permissions are not allowed — set allowSuperPermissions to enable them',
+  'Registry: AllowedCalls required for CALL permission': 'AllowedCalls list is required when using CALL permission without SUPER mode',
+  'Registry: allowedCallsByAgent length mismatch':  'Number of AllowedCalls entries must match the number of agents',
   'Ownable: caller is not the owner':    'Only the vault owner can perform this action',
 };
 
@@ -67,14 +70,27 @@ export function decodeRevertReason(error: unknown): string {
   if (typeof error === 'string') return error;
   if (!(error instanceof Error)) return String(error);
 
+  type ErrorWithExtras = Error & {
+    data?: unknown;
+    shortMessage?: unknown;
+    reason?: unknown;
+    error?: { data?: unknown };
+    cause?: { data?: unknown };
+    code?: unknown;
+  };
+  const e = error as ErrorWithExtras;
+
   // viem ContractFunctionRevertedError: exposes decoded error name
-  const viemData = (error as any).data;
+  const viemData = e.data as { errorName?: string } | undefined;
   if (viemData?.errorName) {
     return SELECTOR_MAP[viemData.errorName] ?? `Transaction reverted: ${viemData.errorName}`;
   }
 
   // ethers v6 / wagmi: shortMessage wraps the original reason
-  const shortMsg: string | undefined = (error as any).shortMessage ?? (error as any).reason;
+  const shortMsg: string | undefined =
+    typeof e.shortMessage === 'string' ? e.shortMessage :
+    typeof e.reason === 'string' ? e.reason :
+    undefined;
   if (typeof shortMsg === 'string' && shortMsg.length > 0) {
     // extract require() reason from viem's formatted string
     const reasonMatch = shortMsg.match(/reverted with reason string "([^"]+)"/);
@@ -90,7 +106,9 @@ export function decodeRevertReason(error: unknown): string {
 
   // 4-byte selector in raw error data
   const rawData: string | undefined =
-    (error as any).data ?? (error as any).error?.data ?? (error as any).cause?.data;
+    (typeof e.data === 'string' ? e.data : undefined) ??
+    (typeof e.error?.data === 'string' ? e.error.data : undefined) ??
+    (typeof e.cause?.data === 'string' ? e.cause.data : undefined);
   if (typeof rawData === 'string' && rawData.startsWith('0x') && rawData.length >= 10) {
     const selector = rawData.slice(0, 10).toLowerCase();
     if (SELECTOR_MAP[selector]) return `Transaction reverted: ${SELECTOR_MAP[selector]}`;
@@ -115,7 +133,7 @@ export function decodeRevertReason(error: unknown): string {
   if (
     msg.includes('User rejected') ||
     msg.includes('user rejected') ||
-    (error as any).code === 4001
+    e.code === 4001
   ) {
     return 'Transaction cancelled by user';
   }
@@ -129,10 +147,11 @@ export function decodeRevertReason(error: unknown): string {
  */
 export function isUserRejection(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
+  const e = error as Error & { code?: unknown };
   const msg = error.message ?? '';
   return (
     msg.includes('User rejected') ||
     msg.includes('user rejected') ||
-    (error as any).code === 4001
+    e.code === 4001
   );
 }

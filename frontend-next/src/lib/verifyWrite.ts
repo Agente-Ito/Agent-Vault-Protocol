@@ -95,3 +95,83 @@ export function summarizeVerificationResults(
     `Please contact support with the transaction hash.`
   );
 }
+
+// ─── LSP6 key derivation (mirrors scripts/lsp6Keys.ts) ────────────────────────
+// AddressPermissions:Permissions:<addr> prefix (10 bytes, no 0x)
+const AP_PERMS_PREFIX   = '4b80742de2bf82acb363';
+// AddressPermissions:AllowedCalls:<addr> prefix (10 bytes, no 0x)
+const AP_ALLOWED_PREFIX = '4b80742de2bf393a64c7';
+
+function lsp6PermissionsKey(address: string): `0x${string}` {
+  const raw = address.toLowerCase().replace(/^0x/, '');
+  return `0x${AP_PERMS_PREFIX}0000${raw}`;
+}
+
+function lsp6AllowedCallsKey(address: string): `0x${string}` {
+  const raw = address.toLowerCase().replace(/^0x/, '');
+  return `0x${AP_ALLOWED_PREFIX}0000${raw}`;
+}
+
+// ─── Per-agent permission verification ────────────────────────────────────────
+
+export interface PermissionsVerificationResult {
+  agent: string;
+  mode: number;
+  permissionsMatch: boolean;
+  allowedCallsMatch: boolean;
+  observedPermissions: string;
+  observedAllowedCalls: string;
+}
+
+/**
+ * After deployVault, reads back each agent's permissions and AllowedCalls from
+ * the ERC725Y storage and compares against what the frontend expected to write.
+ *
+ * @param publicClient       Viem PublicClient
+ * @param safeAddr           AgentSafe contract address
+ * @param agents             Array of { address, mode, expectedPermissions, expectedAllowedCalls }
+ * @returns                  Per-agent verification results
+ */
+export async function verifyPermissionsWrite(
+  publicClient: PublicClient,
+  safeAddr: `0x${string}`,
+  agents: Array<{
+    address: string;
+    mode: number;
+    expectedPermissions: string;
+    expectedAllowedCalls: string;
+  }>,
+): Promise<PermissionsVerificationResult[]> {
+  const norm = (s: string) => s.toLowerCase().replace(/^0x/, '');
+
+  return Promise.all(
+    agents.map(async ({ address, mode, expectedPermissions, expectedAllowedCalls }) => {
+      const permKey    = lsp6PermissionsKey(address);
+      const allowedKey = lsp6AllowedCallsKey(address);
+
+      const [rawPerms, rawAllowed] = await Promise.all([
+        publicClient.readContract({
+          address: safeAddr,
+          abi: ERC725Y_GET_DATA_ABI,
+          functionName: 'getData',
+          args: [permKey],
+        }).catch(() => '0x'),
+        publicClient.readContract({
+          address: safeAddr,
+          abi: ERC725Y_GET_DATA_ABI,
+          functionName: 'getData',
+          args: [allowedKey],
+        }).catch(() => '0x'),
+      ]);
+
+      return {
+        agent: address,
+        mode,
+        permissionsMatch:  norm(rawPerms as string) === norm(expectedPermissions),
+        allowedCallsMatch: norm(rawAllowed as string) === norm(expectedAllowedCalls),
+        observedPermissions:  rawPerms as string,
+        observedAllowedCalls: rawAllowed as string,
+      };
+    }),
+  );
+}

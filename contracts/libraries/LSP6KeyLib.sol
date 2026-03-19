@@ -43,19 +43,61 @@ library LSP6KeyLib {
     ///      Matches _LSP6KEY_ADDRESSPERMISSIONS_ALLOWEDCALLS_PREFIX in LSP6Constants.sol.
     ///
     ///      ⚠️  SUPER_CALL (bit 0x400) bypasses AllowedCalls entirely.
-    ///         AllowedCalls enforcement requires CALL (bit 0x4) WITHOUT SUPER_CALL.
-    ///         The current AGENT_PERM (0x500 = SUPER_CALL | SUPER_TRANSFERVALUE) bypasses this.
+    ///         AllowedCalls enforcement requires CALL (bit 0x800) WITHOUT SUPER_CALL.
     bytes10 internal constant AP_ALLOWED_CALLS_PREFIX =
         bytes10(0x4b80742de2bf393a64c7);
+
+    // ─── Agent permission mode enum ───────────────────────────────────────────
+
+    /// @notice Predefined agent permission profiles. Passed as uint8 in DeployParams.
+    /// @dev CUSTOM (4) uses the caller-supplied customAgentPermissions bitmask.
+    enum AgentMode {
+        STRICT_PAYMENTS,   // 0 — CALL (0x800) | TRANSFERVALUE (0x200) = 0xA00
+        SUBSCRIPTIONS,     // 1 — 0xA00 | EXECUTE_RELAY_CALL (0x400000) = 0x400A00
+        TREASURY_BALANCED, // 2 — CALL | TRANSFERVALUE | STATICCALL (0x2000) = 0x2A00
+        OPS_ADMIN,         // 3 — SETDATA (0x40000) only
+        CUSTOM             // 4 — caller-supplied bitmask (guarded by allowSuperPermissions)
+    }
 
     // ─── Permission bitmaps ───────────────────────────────────────────────────
 
     /// @dev All permissions set — used for vault owner / super-controller.
     bytes32 internal constant SUPER_PERM = bytes32(type(uint256).max);
 
-    /// @dev SUPER_CALL (0x400) | SUPER_TRANSFERVALUE (0x100) = 0x500.
-    ///      Both flags bypass their respective AllowedCalls / AllowedAddresses checks.
+    /// @dev Legacy alias — kept for external callers; equals PERM_POWER_USER.
+    ///      SUPER_CALL (0x400) | SUPER_TRANSFERVALUE (0x100) = 0x500.
     bytes32 internal constant AGENT_PERM = bytes32(uint256(0x500));
+
+    // ─── Mode presets (LSP6 official bit values) ──────────────────────────────
+    // CALL=0x800, TRANSFERVALUE=0x200, STATICCALL=0x2000, SETDATA=0x40000
+    // EXECUTE_RELAY_CALL=0x400000
+
+    /// @dev STRICT_PAYMENTS: CALL (0x800) | TRANSFERVALUE (0x200) = 0xA00
+    ///      AllowedCalls enforced. Suitable for payments and allowances.
+    bytes32 internal constant PERM_STRICT = bytes32(uint256(0x0A00));
+
+    /// @dev SUBSCRIPTIONS: STRICT + EXECUTE_RELAY_CALL (0x400000) = 0x400A00
+    ///      AllowedCalls enforced. Suitable for recurring/relayed payments.
+    bytes32 internal constant PERM_SUBSCRIPTIONS = bytes32(uint256(0x400A00));
+
+    /// @dev TREASURY_BALANCED: CALL | TRANSFERVALUE | STATICCALL (0x2000) = 0x2A00
+    ///      AllowedCalls enforced. Suitable for DeFi integrations.
+    bytes32 internal constant PERM_TREASURY = bytes32(uint256(0x2A00));
+
+    /// @dev OPS_ADMIN: SETDATA (0x40000) only. No value transfer capability.
+    bytes32 internal constant PERM_OPS = bytes32(uint256(0x40000));
+
+    /// @dev POWER_USER: SUPER_CALL | SUPER_TRANSFERVALUE — bypasses AllowedCalls.
+    ///      Only usable when allowSuperPermissions = true.
+    bytes32 internal constant PERM_POWER_USER = bytes32(uint256(0x500));
+
+    // ─── Super-bit mask ───────────────────────────────────────────────────────
+
+    /// @dev Mask covering all SUPER_* permission bits:
+    ///      SUPER_TRANSFERVALUE (0x100) | SUPER_CALL (0x400) |
+    ///      SUPER_STATICCALL (0x1000) | SUPER_DELEGATECALL (0x4000) |
+    ///      SUPER_SETDATA (0x20000) = 0x25500
+    uint256 private constant SUPER_MASK = 0x25500;
 
     // ─── Key derivation ───────────────────────────────────────────────────────
 
@@ -90,5 +132,30 @@ library LSP6KeyLib {
      */
     function apAllowedCallsKey(address controller) internal pure returns (bytes32) {
         return bytes32(abi.encodePacked(AP_ALLOWED_CALLS_PREFIX, bytes2(0), bytes20(controller)));
+    }
+
+    // ─── Permission validation helpers ───────────────────────────────────────
+
+    /// @notice Returns true if `perms` contains any SUPER_* bit.
+    /// @dev Checks the combined SUPER_MASK (0x25500):
+    ///      SUPER_TRANSFERVALUE | SUPER_CALL | SUPER_STATICCALL | SUPER_DELEGATECALL | SUPER_SETDATA.
+    function hasSuperBits(bytes32 perms) internal pure returns (bool) {
+        return uint256(perms) & SUPER_MASK != 0;
+    }
+
+    /// @notice Returns true if `perms` contains the CALL bit (0x800).
+    /// @dev CALL (0x800) is the enforcement-checked bit. SUPER_CALL (0x400) bypasses AllowedCalls.
+    function hasCall(bytes32 perms) internal pure returns (bool) {
+        return uint256(perms) & 0x800 != 0;
+    }
+
+    /// @notice Resolves an AgentMode to its corresponding permission bitmask preset.
+    /// @dev For CUSTOM mode (4), returns bytes32(0) — caller must supply customAgentPermissions.
+    function modeToPermissions(AgentMode mode) internal pure returns (bytes32) {
+        if (mode == AgentMode.STRICT_PAYMENTS)   return PERM_STRICT;
+        if (mode == AgentMode.SUBSCRIPTIONS)      return PERM_SUBSCRIPTIONS;
+        if (mode == AgentMode.TREASURY_BALANCED)  return PERM_TREASURY;
+        if (mode == AgentMode.OPS_ADMIN)          return PERM_OPS;
+        return bytes32(0); // CUSTOM — caller fills in customAgentPermissions
     }
 }

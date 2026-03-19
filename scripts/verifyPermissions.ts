@@ -21,9 +21,11 @@ import {
   AP_ARRAY_KEY,
   apArrayElementKey,
   apPermissionsKey,
+  apAllowedCallsKey,
   decodeArrayLength,
   decodePermissions,
   decodeControllerAddress,
+  hasSuperBits,
 } from "./lsp6Keys";
 
 dotenv.config();
@@ -101,13 +103,30 @@ async function main() {
     console.log(` Perms raw  : ${permRaw === "0x" ? "(empty ⚠)" : permRaw}`);
     console.log(` Perms bits : 0x${permissions.toString(16).padStart(64, "0")}`);
 
+    if (hasSuperBits(permissions)) {
+      console.log(" ⚠  WARN: SUPER_* bits set — AllowedCalls is bypassed for this controller!");
+    }
     if (permissions === 0n) {
       console.log(" ⚠  WARN: permissions bitmap is zero — controller has no access.");
+    }
+
+    // ── 4. Read AllowedCalls for this controller ─────────────────────────
+    const acKey = apAllowedCallsKey(controller);
+    const acRaw: string = await safe.getData(acKey);
+    console.log(` AllowedCalls key : ${acKey}`);
+    if (acRaw === "0x" || acRaw === "") {
+      if (!hasSuperBits(permissions)) {
+        console.log(" AllowedCalls raw : (empty) ⚠  no targets whitelisted");
+      } else {
+        console.log(" AllowedCalls raw : (empty — bypassed by SUPER_* bits)");
+      }
+    } else {
+      console.log(` AllowedCalls raw : ${acRaw}`);
     }
     console.log();
   }
 
-  // ── 4. Probe any additional controllers supplied via env ──────────────────
+  // ── 5. Probe any additional controllers supplied via env ──────────────────
 
   const extra = extraControllers.filter(
     (c) => !storedControllers.some((s) => s.toLowerCase() === c.toLowerCase())
@@ -127,6 +146,9 @@ async function main() {
       console.log(` Perms bits : 0x${permissions.toString(16).padStart(64, "0")}`);
       console.log(` In AP[]    : ${inArray ? "✅ yes" : "❌ no — not listed in AddressPermissions[]"}`);
 
+      if (hasSuperBits(permissions)) {
+        console.log(" ⚠  WARN: SUPER_* bits set — AllowedCalls is bypassed for this controller!");
+      }
       if (permissions === 0n) {
         console.log(" ⚠  WARN: permissions bitmap is zero.");
       }
@@ -144,6 +166,17 @@ async function main() {
 
   if (arrayLength > 0) {
     console.log(`✅ ${arrayLength} controller(s) registered in AddressPermissions[].`);
+    // Count controllers with SUPER bits set
+    let superCount = 0;
+    for (const c of storedControllers) {
+      const raw: string = await safe.getData(apPermissionsKey(c));
+      if (hasSuperBits(decodePermissions(raw))) superCount++;
+    }
+    if (superCount > 0) {
+      console.log(`⚠  ${superCount} controller(s) have SUPER_* bits — AllowedCalls is bypassed for those controllers.`);
+    } else {
+      console.log("✅ No SUPER_* bits set — AllowedCalls enforced for all controllers.");
+    }
   } else {
     console.log("❌ No controllers registered — storage write likely failed or used wrong key.");
   }

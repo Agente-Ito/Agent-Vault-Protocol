@@ -54,6 +54,11 @@ describe("AgentBudgetPolicy - Hybrid Budget Model", function () {
       agentBudgets: [AGENT1_BUDGET, AGENT2_BUDGET], // Per-agent budgets
       merchants: [merchant.address],
       label: "Hybrid Budget Vault",
+      // OPS_ADMIN: tests check policy deployment, not payment execution
+      agentMode:              3, // AgentMode.OPS_ADMIN
+      allowSuperPermissions:  false,
+      customAgentPermissions: ethers.ZeroHash,
+      allowedCallsByAgent:    [],
     });
 
     const receipt = await tx.wait();
@@ -119,6 +124,10 @@ describe("AgentBudgetPolicy - Hybrid Budget Model", function () {
         agentBudgets: [], // Empty = no AgentBudgetPolicy
         merchants: [],
         label: "Simple Budget Vault",
+        agentMode:              3, // OPS_ADMIN
+        allowSuperPermissions:  false,
+        customAgentPermissions: ethers.ZeroHash,
+        allowedCallsByAgent:    [],
       });
 
       const receipt = await tx.wait();

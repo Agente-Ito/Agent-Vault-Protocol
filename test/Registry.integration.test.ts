@@ -19,7 +19,11 @@ import {
   decodePermissions,
   decodeControllerAddress,
   SUPER_PERM,
-  AGENT_PERM,
+  PERM_STRICT_PAYMENTS,
+  PERM_OPS_ADMIN,
+  PERM_POWER_USER,
+  AgentMode,
+  encodeAllowedCalls,
 } from "../scripts/lsp6Keys";
 
 describe("AgentVaultRegistry — Integration", function () {
@@ -59,6 +63,10 @@ describe("AgentVaultRegistry — Integration", function () {
     agentBudgets: bigint[];
     merchants: string[];
     label: string;
+    agentMode: number;
+    allowSuperPermissions: boolean;
+    customAgentPermissions: string;
+    allowedCallsByAgent: Array<{ agent: string; allowedCalls: string }>;
   }>) {
     const p = {
       budget: BUDGET,
@@ -69,6 +77,11 @@ describe("AgentVaultRegistry — Integration", function () {
       agentBudgets: [], // No per-agent budgets by default
       merchants: params?.merchants ?? [],
       label: "Test Vault",
+      // Default: OPS_ADMIN — SETDATA only, no AllowedCalls required
+      agentMode:              AgentMode.OPS_ADMIN,
+      allowSuperPermissions:  false,
+      customAgentPermissions: ethers.ZeroHash,
+      allowedCallsByAgent:    [],
       ...params,
     };
     return registry.connect(owner).deployVault(p);
@@ -113,6 +126,26 @@ describe("AgentVaultRegistry — Integration", function () {
       await expect(deployVault({ merchants })).to.be.revertedWith("Registry: too many merchants");
     });
 
+    it("STRICT_PAYMENTS without allowedCallsByAgent (length mismatch) reverts", async function () {
+      await expect(
+        deployVault({
+          agentMode:              AgentMode.STRICT_PAYMENTS,
+          allowedCallsByAgent:    [],   // length 0, but agents has 1 entry
+        })
+      ).to.be.revertedWith("Registry: AllowedCalls required for CALL permission");
+    });
+
+    it("CUSTOM super bits without allowSuperPermissions=true reverts", async function () {
+      await expect(
+        deployVault({
+          agentMode:              AgentMode.CUSTOM,
+          allowSuperPermissions:  false,
+          customAgentPermissions: PERM_POWER_USER,
+          allowedCallsByAgent:    [],
+        })
+      ).to.be.revertedWith("Registry: super permissions disabled");
+    });
+
     it("should revert if expiration timestamp is in the past", async function () {
       const latest = await ethers.provider.getBlock('latest');
       const pastTimestamp = latest!.timestamp - 3600; // 1 hour before current block
@@ -136,7 +169,11 @@ describe("AgentVaultRegistry — Integration", function () {
 
   describe("LSP14 two-step ownership transfer", function () {
     it("full flow: deployVault → acceptOwnership on safe and policyEngine → agent still works", async function () {
-      const tx = await deployVault({ merchants: [merchant.address] });
+      const tx = await deployVault({
+        merchants: [merchant.address],
+        agentMode: AgentMode.STRICT_PAYMENTS,
+        allowedCallsByAgent: [{ agent: agent.address, allowedCalls: encodeAllowedCalls([merchant.address]) }],
+      });
       const receipt = await tx.wait();
       const event = receipt!.logs
         .map((log) => {
@@ -204,6 +241,8 @@ describe("AgentVaultRegistry — Integration", function () {
         merchants: [merchant.address],
         budget: BUDGET,
         period: 1, // WEEKLY
+        agentMode:           AgentMode.STRICT_PAYMENTS,
+        allowedCallsByAgent: [{ agent: agent.address, allowedCalls: encodeAllowedCalls([merchant.address]) }],
       });
       const receipt = await tx.wait();
       const event = receipt!.logs
@@ -314,6 +353,11 @@ describe("AgentVaultRegistry — Integration", function () {
         agentBudgets: [],
         merchants: [],
         label: "Perm Test Vault",
+        // OPS_ADMIN: SETDATA only, no AllowedCalls required
+        agentMode:              AgentMode.OPS_ADMIN,
+        allowSuperPermissions:  false,
+        customAgentPermissions: ethers.ZeroHash,
+        allowedCallsByAgent:    [],
       });
       const receipt = await tx.wait();
       const event = receipt!.logs
@@ -349,9 +393,9 @@ describe("AgentVaultRegistry — Integration", function () {
       expect(raw.toLowerCase()).to.equal(SUPER_PERM.toLowerCase());
     });
 
-    it("agent has CALL + TRANSFERVALUE permissions (0x500)", async function () {
+    it("agent has OPS_ADMIN permissions (SETDATA only = 0x40000)", async function () {
       const raw = await safe.getData(apPermissionsKey(agent.address));
-      expect(decodePermissions(raw)).to.equal(BigInt(AGENT_PERM));
+      expect(decodePermissions(raw)).to.equal(BigInt(PERM_OPS_ADMIN));
     });
 
     it("unknown address has no permissions", async function () {
@@ -371,6 +415,11 @@ describe("AgentVaultRegistry — Integration", function () {
         agentBudgets: [],
         merchants: [],
         label: "Multi-agent Vault",
+        // OPS_ADMIN: no AllowedCalls needed, just verify array storage
+        agentMode:              AgentMode.OPS_ADMIN,
+        allowSuperPermissions:  false,
+        customAgentPermissions: ethers.ZeroHash,
+        allowedCallsByAgent:    [],
       });
       const receipt = await tx.wait();
       const event = receipt!.logs

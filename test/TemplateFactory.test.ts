@@ -12,6 +12,7 @@ import {
   BudgetPolicy,
   AgentBudgetPolicy,
 } from "../typechain-types";
+import { encodeAllowedCalls } from "../scripts/lsp6Keys";
 
 describe("TemplateFactory — Vault Creation from Templates", function () {
   let owner: SignerWithAddress;
@@ -65,6 +66,8 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
           customExpiration: 0,
           customMerchants: [],
           customLabel: "",
+          agentMode: 3, // OPS_ADMIN — no AllowedCalls required
+          allowedCallsByAgent: [],
         },
         [agent1.address],
         []
@@ -107,6 +110,8 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
           customExpiration: 0,
           customMerchants: [],
           customLabel: "",
+          agentMode: 3, // OPS_ADMIN
+          allowedCallsByAgent: [],
         },
         [agent1.address, agent2.address],
         [ethers.parseEther("5000"), ethers.parseEther("5000")]
@@ -128,6 +133,8 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
           customExpiration: 0,
           customMerchants: [],
           customLabel: "",
+          agentMode: 3, // OPS_ADMIN
+          allowedCallsByAgent: [],
         },
         [agent1.address],
         []
@@ -156,6 +163,8 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
           customExpiration: 0,
           customMerchants: [],
           customLabel: "",
+          agentMode: 3, // OPS_ADMIN
+          allowedCallsByAgent: [],
         },
         [agent1.address],
         []
@@ -188,6 +197,8 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
           customExpiration,
           customMerchants: [],
           customLabel: "",
+          agentMode: 3, // OPS_ADMIN
+          allowedCallsByAgent: [],
         },
         [agent1.address],
         []
@@ -207,6 +218,8 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
           customExpiration: 0,
           customMerchants,
           customLabel: "",
+          agentMode: 3, // OPS_ADMIN
+          allowedCallsByAgent: [],
         },
         [agent1.address],
         []
@@ -236,6 +249,8 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
           customExpiration: 0,
           customMerchants: [],
           customLabel,
+          agentMode: 3, // OPS_ADMIN
+          allowedCallsByAgent: [],
         },
         [agent1.address],
         []
@@ -262,6 +277,12 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
           customExpiration: 0,
           customMerchants: [merchant.address],
           customLabel: "My Grocery Agent",
+          // STRICT_PAYMENTS: agent→merchant AllowedCalls enforced by LSP6
+          agentMode: 0,
+          allowedCallsByAgent: [
+            { agent: agent1.address, allowedCalls: encodeAllowedCalls([merchant.address]) },
+            { agent: agent2.address, allowedCalls: encodeAllowedCalls([merchant.address]) },
+          ],
         },
         [agent1.address, agent2.address],
         []
@@ -334,6 +355,8 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
           customExpiration: 0,
           customMerchants: [],
           customLabel: "Employee Payroll Q1",
+          agentMode: 3, // OPS_ADMIN
+          allowedCallsByAgent: [],
         },
         [agent1.address, agent2.address],
         agentBudgets
@@ -382,6 +405,8 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
           customExpiration: futureTime,
           customMerchants: [merchant.address],
           customLabel: "Annual Magazine Subscription",
+          agentMode: 3, // OPS_ADMIN
+          allowedCallsByAgent: [],
         },
         [agent1.address],
         []
@@ -410,6 +435,11 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
         agentBudgets: [],
         merchants: [merchant.address],
         label: "Direct Registry Vault",
+        // OPS_ADMIN: no AllowedCalls required for backward-compat test
+        agentMode:              3,
+        allowSuperPermissions:  false,
+        customAgentPermissions: ethers.ZeroHash,
+        allowedCallsByAgent:    [],
       });
 
       const receipt = await tx.wait();
@@ -430,6 +460,8 @@ describe("TemplateFactory — Vault Creation from Templates", function () {
             customExpiration: 0,
             customMerchants: [],
             customLabel: "",
+            agentMode: 3,
+            allowedCallsByAgent: [],
           },
           [agent1.address],
           []

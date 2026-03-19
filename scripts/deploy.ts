@@ -6,7 +6,9 @@ import {
   apArrayElementKey,
   apPermissionsKey,
   SUPER_PERM,
-  AGENT_PERM,
+  PERM_STRICT_PAYMENTS,
+  AgentMode,
+  encodeAllowedCalls,
   verifyWrite,
   decodeHardhatError,
 } from "./lsp6Keys";
@@ -100,6 +102,13 @@ async function main() {
     agentBudgets: [],                    // no per-agent budgets for demo
     merchants: [deployer.address],       // deployer as demo merchant
     label: "Demo Vault – Weekly Budget",
+    // Permission profile — no SUPER_* bits; AllowedCalls enforced on-chain
+    agentMode: AgentMode.STRICT_PAYMENTS,
+    allowSuperPermissions: false,
+    customAgentPermissions: ethers.ZeroHash,
+    allowedCallsByAgent: [
+      { agent: agentWallet.address, allowedCalls: encodeAllowedCalls([deployer.address]) },
+    ],
   };
 
   const estimatedGas = await registry.deployVault.estimateGas(deployParams);
@@ -145,7 +154,7 @@ async function main() {
   try {
     await verifyWrite(safeERC725, AP_ARRAY_KEY, expectedArrayLength, "AddressPermissions[] length = 2");
     await verifyWrite(safeERC725, ownerPermKey, SUPER_PERM, "owner SUPER permissions");
-    await verifyWrite(safeERC725, agentPermKey, AGENT_PERM, "agent AGENT permissions");
+    await verifyWrite(safeERC725, agentPermKey, PERM_STRICT_PAYMENTS, "agent STRICT_PAYMENTS permissions");
     console.log("✅ All permission writes verified on-chain");
   } catch (err: unknown) {
     console.error("❌ Permission verification failed:", decodeHardhatError(err));

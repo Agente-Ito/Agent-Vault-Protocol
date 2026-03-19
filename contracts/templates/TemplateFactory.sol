@@ -26,6 +26,10 @@ contract TemplateFactory {
         uint256 customExpiration;  // 0 = use template default (or 0 if template has no expiry)
         address[] customMerchants; // empty = use template default
         string customLabel;        // empty = use template default label
+        /// @dev 0=STRICT, 1=SUBSCRIPTIONS, 2=TREASURY, 3=OPS_ADMIN, 4=CUSTOM
+        uint8 agentMode;
+        /// @dev Per-agent AllowedCalls — required when agentMode has CALL without SUPER.
+        AgentVaultRegistry.AllowedCallsInput[] allowedCallsByAgent;
     }
 
     event TemplateApplied(
@@ -90,6 +94,12 @@ contract TemplateFactory {
         dp.agents = agents;
         dp.agentBudgets = agentBudgets;
 
+        // Set permission profile from template params
+        dp.agentMode = tp.agentMode;
+        dp.allowSuperPermissions = false;
+        dp.customAgentPermissions = bytes32(0);
+        dp.allowedCallsByAgent = tp.allowedCallsByAgent;
+
         // Deploy vault via registry (use deployVaultOnBehalf to register vault under caller's address)
         record = registry.deployVaultOnBehalf(msg.sender, dp);
 
@@ -115,6 +125,10 @@ contract TemplateFactory {
             dp.expiration = block.timestamp + 7 days;
             dp.merchants = new address[](0); // Defaults to empty; caller can override
             dp.label = "Grocery Vault";
+            dp.agentMode = 0; // STRICT_PAYMENTS default — caller must supply allowedCallsByAgent
+            dp.allowSuperPermissions = false;
+            dp.customAgentPermissions = bytes32(0);
+            dp.allowedCallsByAgent = new AgentVaultRegistry.AllowedCallsInput[](0); // set by caller
             return dp;
         }
 
@@ -127,6 +141,10 @@ contract TemplateFactory {
             dp.expiration = block.timestamp + 365 days;
             dp.merchants = new address[](0);
             dp.label = "Subscription Vault";
+            dp.agentMode = 1; // SUBSCRIPTIONS
+            dp.allowSuperPermissions = false;
+            dp.customAgentPermissions = bytes32(0);
+            dp.allowedCallsByAgent = new AgentVaultRegistry.AllowedCallsInput[](0);
             return dp;
         }
 
@@ -139,6 +157,10 @@ contract TemplateFactory {
             dp.expiration = 0; // No expiration
             dp.merchants = new address[](0);
             dp.label = "Strategy Vault";
+            dp.agentMode = 2; // TREASURY_BALANCED
+            dp.allowSuperPermissions = false;
+            dp.customAgentPermissions = bytes32(0);
+            dp.allowedCallsByAgent = new AgentVaultRegistry.AllowedCallsInput[](0);
             return dp;
         }
 
@@ -152,6 +174,10 @@ contract TemplateFactory {
             dp.expiration = 0; // No expiration (recurs indefinitely)
             dp.merchants = new address[](0);
             dp.label = "Payroll Vault";
+            dp.agentMode = 0; // STRICT_PAYMENTS — caller must supply allowedCallsByAgent
+            dp.allowSuperPermissions = false;
+            dp.customAgentPermissions = bytes32(0);
+            dp.allowedCallsByAgent = new AgentVaultRegistry.AllowedCallsInput[](0);
             return dp;
         }
 
@@ -164,6 +190,10 @@ contract TemplateFactory {
             dp.expiration = 0;
             dp.merchants = new address[](0);
             dp.label = "Test Vault";
+            dp.agentMode = 3; // OPS_ADMIN — safe default for testing; no AllowedCalls needed
+            dp.allowSuperPermissions = false;
+            dp.customAgentPermissions = bytes32(0);
+            dp.allowedCallsByAgent = new AgentVaultRegistry.AllowedCallsInput[](0);
             return dp;
         }
 

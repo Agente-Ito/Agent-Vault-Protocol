@@ -1,6 +1,15 @@
 import { ethers } from "hardhat";
 import * as fs from "fs";
 import * as path from "path";
+import {
+  AP_ARRAY_KEY,
+  apArrayElementKey,
+  apPermissionsKey,
+  SUPER_PERM,
+  AGENT_PERM,
+  verifyWrite,
+  decodeHardhatError,
+} from "./lsp6Keys";
 
 interface DeploymentResult {
   network: string;
@@ -126,7 +135,24 @@ async function main() {
   console.log("  LSP6KeyManager: ", kmAddr);
   console.log("  PolicyEngine:   ", peAddr);
 
-  // 4. Accept ownership on AgentSafe (LSP14 two-step — only Safe uses LSP14)
+  // 4. Post-deploy permission verification (read-back from ERC725Y storage)
+  console.log("\n🔍 Verifying on-chain permission storage...");
+  const safeERC725 = await ethers.getContractAt("AgentSafe", safeAddr);
+  const ownerPermKey = apPermissionsKey(deployer.address);
+  const agentPermKey = apPermissionsKey(agentWallet.address);
+  // AP_ARRAY_KEY stores abi.encodePacked(uint128(count)) = 16 bytes (32 hex chars)
+  const expectedArrayLength = "0x00000000000000000000000000000002"; // 1 owner + 1 agent
+  try {
+    await verifyWrite(safeERC725, AP_ARRAY_KEY, expectedArrayLength, "AddressPermissions[] length = 2");
+    await verifyWrite(safeERC725, ownerPermKey, SUPER_PERM, "owner SUPER permissions");
+    await verifyWrite(safeERC725, agentPermKey, AGENT_PERM, "agent AGENT permissions");
+    console.log("✅ All permission writes verified on-chain");
+  } catch (err: unknown) {
+    console.error("❌ Permission verification failed:", decodeHardhatError(err));
+    throw err;
+  }
+
+  // 5. Accept ownership on AgentSafe (LSP14 two-step — only Safe uses LSP14)
   //    PolicyEngine and BudgetPolicy use OZ Ownable (single-step), no acceptOwnership needed.
   console.log("\n🔐 Accepting ownership on AgentSafe (LSP14)...");
   const safe = await ethers.getContractAt("AgentSafe", safeAddr);

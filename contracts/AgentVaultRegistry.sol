@@ -11,6 +11,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 interface IAgentSafe {
     function setData(bytes32 key, bytes memory value) external;
+    function getData(bytes32 key) external view returns (bytes memory);
     function setPolicyEngine(address pe) external;
     function setKeyManager(address km) external;
     function transferOwnership(address newOwner) external;
@@ -70,6 +71,19 @@ contract AgentVaultRegistry is Ownable {
     mapping(address => bool) public authorizedCallers;
 
     event CallerAuthorizationChanged(address indexed caller, bool authorized);
+
+    /// @notice Emitted after every ERC725Y setData call for forensics and sync verification.
+    ///         Allows off-chain tools and support to detect storage mismatches.
+    /// @param key          The ERC725Y data key that was written
+    /// @param safeAddr     The AgentSafe contract address
+    /// @param intended     keccak256 of the value passed to setData()
+    /// @param observed     keccak256 of the value read back via getData() immediately after
+    event DiagnosticWrite(
+        bytes32 indexed key,
+        address indexed safeAddr,
+        bytes32 intended,
+        bytes32 observed
+    );
 
     /// @dev LSP2 MappingWithGrouping prefix for AddressPermissions:Permissions:<address>.
     ///      bytes10(keccak256("AddressPermissions:Permissions")) truncated to first 10 bytes.
@@ -142,14 +156,27 @@ contract AgentVaultRegistry is Ownable {
 
     // ─── Internal helpers ─────────────────────────────────────────────────────
 
+    /// @dev Writes a key/value into an AgentSafe's ERC725Y storage, then immediately
+    ///      reads it back to verify the write succeeded. Emits DiagnosticWrite with
+    ///      the keccak256 hashes of the intended and observed values for forensics.
+    ///      Reverts if the observed value does not match the intended value.
+    function _setDataVerified(IAgentSafe safe, bytes32 key, bytes memory value) private {
+        safe.setData(key, value);
+        bytes memory observed = safe.getData(key);
+        bytes32 intendedHash = keccak256(value);
+        bytes32 observedHash = keccak256(observed);
+        emit DiagnosticWrite(key, address(safe), intendedHash, observedHash);
+        require(intendedHash == observedHash, "Registry: write verification failed");
+    }
+
     function _appendToAddressPermissionsArray(
         IAgentSafe safe,
         address controller,
         uint128 index
     ) private {
         bytes32 elementKey = bytes32(abi.encodePacked(AP_ARRAY_KEY_PREFIX, bytes16(index)));
-        safe.setData(elementKey, abi.encodePacked(bytes20(controller)));
-        safe.setData(AP_ARRAY_KEY, abi.encodePacked(uint128(index + 1)));
+        _setDataVerified(safe, elementKey, abi.encodePacked(bytes20(controller)));
+        _setDataVerified(safe, AP_ARRAY_KEY, abi.encodePacked(uint128(index + 1)));
     }
 
     // ─── Deployment ───────────────────────────────────────────────────────────
@@ -234,21 +261,24 @@ contract AgentVaultRegistry is Ownable {
         // 9. Link KM to Safe
         safe.setKeyManager(km);
 
-        // 10. Write owner SUPER_* permissions into safe's ERC725Y storage
+        // 10. Write owner SUPER_* permissions into safe's ERC725Y storage (with read-back verification)
         bytes32 superPerm = bytes32(type(uint256).max);
-        safe.setData(
+        _setDataVerified(
+            safe,
             bytes32(abi.encodePacked(LSP6_PERMISSIONS_PREFIX, bytes2(0), bytes20(owner))),
             abi.encodePacked(superPerm)
         );
         uint128 apIdx = 0;
         _appendToAddressPermissionsArray(safe, owner, apIdx++);
 
-        // 11. Write permissions for each agent
-        //     SUPER_CALL (0x400) | SUPER_TRANSFERVALUE (0x100) = 0x500
+        // 11. Write permissions for each agent (SUPER_CALL 0x400 | SUPER_TRANSFERVALUE 0x100 = 0x500)
+        //     Note: SUPER_CALL bypasses AddressPermissions:AllowedCalls entirely.
+        //     To enforce AllowedCalls, switch to CALL (0x4) and set AllowedCalls per agent.
         bytes32 agentPerm = bytes32(uint256(0x0000000000000000000000000000000000000000000000000000000000000500));
         for (uint256 i = 0; i < p.agents.length; i++) {
             address agentAddr = p.agents[i];
-            safe.setData(
+            _setDataVerified(
+                safe,
                 bytes32(abi.encodePacked(LSP6_PERMISSIONS_PREFIX, bytes2(0), bytes20(agentAddr))),
                 abi.encodePacked(agentPerm)
             );

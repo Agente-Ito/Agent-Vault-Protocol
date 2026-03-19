@@ -1,17 +1,24 @@
 'use client';
 
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import type { EntityType } from '@/lib/onboarding/entityData';
 
-export type UseCase = 'family' | 'daily' | 'defi' | null;
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface OnboardingState {
-  step: number;           // 0-3
+  step: number;           // 0-4
   visible: boolean;
   completed: boolean;
-  dismissed: boolean;     // "no mostrar de nuevo"
-  useCase: UseCase;
+  dismissed: boolean;
+  // Step 0: entity type
+  entityType: EntityType | null;
+  // Step 1: profile within entity
+  entityProfile: string | null;
+  // Step 2: vault setup
   vaultName: string;
   vaultEmoji: string;
+  selectedSubVaults: string[];   // sub-vault template ids the user toggled on
+  // Step 3: budget
   rootBudget: string;
   budgetPeriod: 'daily' | 'weekly' | 'monthly';
 }
@@ -23,9 +30,11 @@ interface OnboardingContextType extends OnboardingState {
   back: () => void;
   finish: () => void;
   dismissPermanently: () => void;
-  setUseCase: (uc: UseCase) => void;
+  setEntityType: (t: EntityType) => void;
+  setEntityProfile: (id: string) => void;
   setVaultName: (s: string) => void;
   setVaultEmoji: (s: string) => void;
+  toggleSubVault: (id: string) => void;
   setRootBudget: (s: string) => void;
   setBudgetPeriod: (p: 'daily' | 'weekly' | 'monthly') => void;
 }
@@ -34,39 +43,39 @@ const OnboardingContext = createContext<OnboardingContextType | undefined>(undef
 
 const STORAGE_COMPLETED = 'onboarding-completed';
 const STORAGE_DISMISSED = 'onboarding-dismissed';
-const MAX_STEPS = 4;
+export const MAX_STEPS = 5;
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
-  const [hydrated, setHydrated] = useState(false);
-  const [step, setStep] = useState(0);
-  const [visible, setVisible] = useState(false);
-  const [completed, setCompleted] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
-  const [useCase, setUseCaseState] = useState<UseCase>(null);
-  const [vaultName, setVaultNameState] = useState('');
-  const [vaultEmoji, setVaultEmojiState] = useState('💰');
-  const [rootBudget, setRootBudgetState] = useState('1');
-  const [budgetPeriod, setBudgetPeriodState] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+  const [hydrated, setHydrated]           = useState(false);
+  const [step, setStep]                   = useState(0);
+  const [visible, setVisible]             = useState(false);
+  const [completed, setCompleted]         = useState(false);
+  const [dismissed, setDismissed]         = useState(false);
 
-  // SSR hydration guard — same pattern as ModeContext
+  const [entityType, setEntityTypeState]       = useState<EntityType | null>(null);
+  const [entityProfile, setEntityProfileState] = useState<string | null>(null);
+  const [vaultName, setVaultNameState]         = useState('');
+  const [vaultEmoji, setVaultEmojiState]       = useState('💰');
+  const [selectedSubVaults, setSelectedSubVaults] = useState<string[]>([]);
+  const [rootBudget, setRootBudgetState]       = useState('1');
+  const [budgetPeriod, setBudgetPeriodState]   = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+
   useEffect(() => {
     const isCompleted = localStorage.getItem(STORAGE_COMPLETED) === 'true';
     const isDismissed = localStorage.getItem(STORAGE_DISMISSED) === 'true';
     setCompleted(isCompleted);
     setDismissed(isDismissed);
-    // Show on first visit unless permanently dismissed or completed
-    if (!isCompleted && !isDismissed) {
-      setVisible(true);
-    }
+    if (!isCompleted && !isDismissed) setVisible(true);
     setHydrated(true);
   }, []);
 
   const open = useCallback(() => {
     setVisible(true);
-    // Clear dismissed in state so the modal renders (localStorage keeps the
-    // "don't auto-show" preference for future page loads).
     setDismissed(false);
   }, []);
+
   const close = useCallback(() => setVisible(false), []);
 
   const next = useCallback(() => {
@@ -89,19 +98,39 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     localStorage.setItem(STORAGE_DISMISSED, 'true');
   }, []);
 
-  const setUseCase = useCallback((uc: UseCase) => setUseCaseState(uc), []);
-  const setVaultName = useCallback((s: string) => setVaultNameState(s), []);
-  const setVaultEmoji = useCallback((s: string) => setVaultEmojiState(s), []);
-  const setRootBudget = useCallback((s: string) => setRootBudgetState(s), []);
+  const setEntityType = useCallback((t: EntityType) => {
+    setEntityTypeState(t);
+    // Reset downstream selections when entity changes
+    setEntityProfileState(null);
+    setSelectedSubVaults([]);
+    setVaultNameState('');
+    setVaultEmojiState('💰');
+  }, []);
+
+  const setEntityProfile = useCallback((id: string) => {
+    setEntityProfileState(id);
+  }, []);
+
+  const toggleSubVault = useCallback((id: string) => {
+    setSelectedSubVaults((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  const setVaultName    = useCallback((s: string) => setVaultNameState(s), []);
+  const setVaultEmoji   = useCallback((s: string) => setVaultEmojiState(s), []);
+  const setRootBudget   = useCallback((s: string) => setRootBudgetState(s), []);
   const setBudgetPeriod = useCallback((p: 'daily' | 'weekly' | 'monthly') => setBudgetPeriodState(p), []);
 
   return (
     <OnboardingContext.Provider
       value={{
-        step, visible: hydrated && visible, completed, dismissed, useCase,
-        vaultName, vaultEmoji, rootBudget, budgetPeriod,
+        step, visible: hydrated && visible, completed, dismissed,
+        entityType, entityProfile, vaultName, vaultEmoji,
+        selectedSubVaults, rootBudget, budgetPeriod,
         open, close, next, back, finish, dismissPermanently,
-        setUseCase, setVaultName, setVaultEmoji, setRootBudget, setBudgetPeriod,
+        setEntityType, setEntityProfile, setVaultName, setVaultEmoji,
+        toggleSubVault, setRootBudget, setBudgetPeriod,
       }}
     >
       {children}

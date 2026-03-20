@@ -19,6 +19,7 @@ interface DeploymentResult {
   deployer: string;
   registryAddress: string;
   merchantRegistryAddress: string;
+  taskSchedulerAddress: string;
   agentSafeAddress: string;
   keyManagerAddress: string;
   policyEngineAddress: string;
@@ -71,15 +72,23 @@ async function main() {
   console.log("✅ AgentVaultDeployer:", vdAddr);
 
   // 4. Deploy AgentKMDeployer
-  console.log("\n[4/5] Deploying AgentKMDeployer...");
+  console.log("\n[4/6] Deploying AgentKMDeployer...");
   const KMFactory = await ethers.getContractFactory("AgentKMDeployer");
   const km = await KMFactory.deploy({ nonce: nonce++ });
   await km.waitForDeployment();
   const kmDeployerAddr = await km.getAddress();
   console.log("✅ AgentKMDeployer:", kmDeployerAddr);
 
-  // 5. Deploy AgentVaultRegistry
-  console.log("\n[5/5] Deploying AgentVaultRegistry...");
+  // 5. Deploy TaskScheduler
+  console.log("\n[5/6] Deploying TaskScheduler...");
+  const TaskSchedulerFactory = await ethers.getContractFactory("TaskScheduler");
+  const taskScheduler = await TaskSchedulerFactory.deploy({ nonce: nonce++ });
+  await taskScheduler.waitForDeployment();
+  const taskSchedulerAddr = await taskScheduler.getAddress();
+  console.log("✅ TaskScheduler:", taskSchedulerAddr);
+
+  // 6. Deploy AgentVaultRegistry
+  console.log("\n[6/6] Deploying AgentVaultRegistry...");
   const AgentVaultRegistryFactory = await ethers.getContractFactory("AgentVaultRegistry");
   const registry = await AgentVaultRegistryFactory.deploy(coreAddr, vdAddr, kmDeployerAddr, { nonce: nonce++ });
   const registryAddr = await registry.getAddress();
@@ -193,6 +202,7 @@ async function main() {
     deployer: deployer.address,
     registryAddress: registryAddr,
     merchantRegistryAddress: merchantRegistryAddr,
+    taskSchedulerAddress: taskSchedulerAddr,
     agentSafeAddress: safeAddr,
     keyManagerAddress: kmAddr,
     policyEngineAddress: peAddr,
@@ -212,6 +222,7 @@ async function main() {
   const updates = [
     { key: "REGISTRY_ADDRESS", value: result.registryAddress },
     { key: "MERCHANT_REGISTRY_ADDRESS", value: result.merchantRegistryAddress },
+    { key: "TASK_SCHEDULER_ADDRESS", value: result.taskSchedulerAddress },
     { key: "AGENT_SAFE_ADDRESS", value: result.agentSafeAddress },
     { key: "KEY_MANAGER_ADDRESS", value: result.keyManagerAddress },
     { key: "POLICY_ENGINE_ADDRESS", value: result.policyEngineAddress },
@@ -231,11 +242,22 @@ async function main() {
   fs.writeFileSync(envPath, envContent);
   console.log("✅ Variables saved to .env");
 
+  // 7b. Save deployment JSON
+  const deploymentsDir = path.join(__dirname, "..", "deployments");
+  fs.mkdirSync(deploymentsDir, { recursive: true });
+  const jsonPath = path.join(deploymentsDir, `lukso-testnet-${network.chainId}.json`);
+  fs.writeFileSync(
+    jsonPath,
+    JSON.stringify(result, (_, v) => (typeof v === "bigint" ? v.toString() : v), 2)
+  );
+  console.log("✅ Deployment JSON saved to", jsonPath);
+
   // 8. Block explorer links
   console.log("\n🔍 Block Explorer Links (LUKSO Testnet):");
   console.log(`  DeployerCore:   https://explorer.testnet.lukso.network/address/${coreAddr}`);
   console.log(`  Deployer:       https://explorer.testnet.lukso.network/address/${vdAddr}`);
   console.log(`  KMDeployer:     https://explorer.testnet.lukso.network/address/${kmDeployerAddr}`);
+  console.log(`  TaskScheduler:  https://explorer.testnet.lukso.network/address/${taskSchedulerAddr}`);
   console.log(`  Registry:       https://explorer.testnet.lukso.network/address/${registryAddr}`);
   console.log(`  Safe:           https://explorer.testnet.lukso.network/address/${safeAddr}`);
   console.log(`  KeyManager:     https://explorer.testnet.lukso.network/address/${kmAddr}`);

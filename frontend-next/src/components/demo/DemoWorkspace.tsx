@@ -12,8 +12,6 @@ import {
   useDemo,
   type DemoPersonaId,
   type DemoPeriod,
-  type DemoSubVaultDef,
-  type DemoMerchant,
 } from '@/context/DemoContext';
 import type { AgentMiniRecord } from '@/components/dashboard/AgentCardScroll';
 

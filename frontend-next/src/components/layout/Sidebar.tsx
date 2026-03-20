@@ -16,6 +16,7 @@ type NavItem = { href: string; labelKey: string; icon: string };
 const CORE_ITEMS: NavItem[] = [
   { href: '/dashboard',  labelKey: 'nav.dashboard',  icon: '📊' },
   { href: '/vaults',     labelKey: 'nav.vaults',     icon: '🔐' },
+  { href: '/missions',   labelKey: 'nav.missions',   icon: '🎯' },
   { href: '/rules',      labelKey: 'nav.rules',      icon: '🛡️' },
   { href: '/activity',   labelKey: 'nav.activity',   icon: '📈' },
   { href: '/profiles',   labelKey: 'nav.profiles',   icon: '👥' },
@@ -37,10 +38,12 @@ function NavLink({
   item,
   isActive,
   onClose,
+  badge,
 }: {
   item: NavItem;
   isActive: boolean;
   onClose: () => void;
+  badge?: string;
 }) {
   const { t } = useI18n();
   return (
@@ -60,7 +63,12 @@ function NavLink({
         <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-white rounded-r-full" />
       )}
       <span className="text-base" aria-hidden="true">{item.icon}</span>
-      <span>{t(item.labelKey as Parameters<typeof t>[0])}</span>
+      <span className="flex-1">{t(item.labelKey as Parameters<typeof t>[0])}</span>
+      {badge && (
+        <span className="text-xs px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-400 font-normal">
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -129,7 +137,13 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
             <>
               <SectionDivider label={t('nav.section.pro')} />
               {PRO_ITEMS.map((item) => (
-                <NavLink key={item.href} item={item} isActive={isActive(item.href)} onClose={onClose} />
+                <NavLink
+                  key={item.href}
+                  item={item}
+                  isActive={isActive(item.href)}
+                  onClose={onClose}
+                  badge={item.href === '/agents' ? 'Advanced' : undefined}
+                />
               ))}
             </>
           )}
@@ -146,7 +160,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
         <div className="px-4 py-3 border-t border-neutral-800 bg-neutral-950 flex-shrink-0 space-y-2">
           {/* Demo mode toggle */}
           <button
-            onClick={() => { isDemo ? disableDemo() : enableDemo(); onClose(); }}
+            onClick={() => { if (isDemo) { disableDemo(); } else { enableDemo(); } onClose(); }}
             className={cn(
               'w-full flex items-center gap-2 text-xs transition-colors',
               isDemo

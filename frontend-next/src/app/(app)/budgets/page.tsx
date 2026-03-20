@@ -25,75 +25,62 @@ export default function BudgetsPage() {
   }
   const selected = findNode(nodes, selectedId);
 
-  const totalSpent = nodes.reduce((s, n) => s + n.spent, 0);
+  const totalSpent  = nodes.reduce((s, n) => s + n.spent, 0);
   const totalBudget = nodes.reduce((s, n) => s + n.total, 0);
+
+  const available = totalBudget - totalSpent;
+  const usagePct  = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
+  const usageBarColor = usagePct >= 100 ? 'var(--blocked)' : usagePct >= 85 ? 'var(--warning)' : 'var(--success)';
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50">{t('budgets.title')}</h1>
-          <p className="text-neutral-500 dark:text-neutral-400 mt-1 text-sm">
-            {t('budgets.subtitle')}
-          </p>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{t('budgets.title')}</h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>{t('budgets.subtitle')}</p>
         </div>
-        <Button size="sm" onClick={() => setShowCreate(true)}>
-          {t('budgets.new_category')}
-        </Button>
+        <Button size="sm" onClick={() => setShowCreate(true)}>{t('budgets.new_category')}</Button>
       </div>
 
       {/* Summary cards */}
-      {(() => {
-        const available = totalBudget - totalSpent;
-        const usagePct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
-        const usageColor = usagePct >= 100 ? 'bg-red-500' : usagePct >= 85 ? 'bg-yellow-400' : 'bg-green-500';
-        return (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-4 flex items-center gap-3">
-              <span className="text-2xl">💸</span>
-              <div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('budgets.summary.spent')}</p>
-                <p className="text-xl font-bold text-neutral-900 dark:text-neutral-50">${totalSpent.toLocaleString()}</p>
-              </div>
-            </div>
-            <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-4 flex items-center gap-3">
-              <span className="text-2xl">🎯</span>
-              <div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('budgets.summary.limit')}</p>
-                <p className="text-xl font-bold text-neutral-900 dark:text-neutral-50">${totalBudget.toLocaleString()}</p>
-              </div>
-            </div>
-            <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-4 flex items-center gap-3">
-              <span className="text-2xl">{available >= 0 ? '✅' : '🚨'}</span>
-              <div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('budgets.summary.available')}</p>
-                <p className={`text-xl font-bold ${available >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                  ${Math.max(0, available).toLocaleString()}
-                </p>
-              </div>
-            </div>
-            <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">📊</span>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('budgets.summary.usage')}</p>
-                <span className="ml-auto text-lg font-bold text-neutral-900 dark:text-neutral-50">{usagePct}%</span>
-              </div>
-              <div className="h-1.5 w-full rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
-                <div className={`h-full rounded-full transition-all ${usageColor}`} style={{ width: `${usagePct}%` }} />
-              </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { emoji: '💸', label: t('budgets.summary.spent'),     value: `$${totalSpent.toLocaleString()}`,          color: 'var(--text)' },
+          { emoji: '🎯', label: t('budgets.summary.limit'),     value: `$${totalBudget.toLocaleString()}`,         color: 'var(--text)' },
+          { emoji: available >= 0 ? '✅' : '🚨', label: t('budgets.summary.available'), value: `$${Math.max(0, available).toLocaleString()}`, color: available >= 0 ? 'var(--success)' : 'var(--blocked)' },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="rounded-xl p-4 flex items-center gap-3"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+          >
+            <span className="text-2xl">{s.emoji}</span>
+            <div>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+              <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
             </div>
           </div>
-        );
-      })()}
+        ))}
+        <div
+          className="rounded-xl p-4"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">📊</span>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('budgets.summary.usage')}</p>
+            <span className="ml-auto text-lg font-bold" style={{ color: 'var(--text)' }}>{usagePct}%</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: 'var(--card-mid)' }}>
+            <div className="h-full rounded-full transition-all" style={{ width: `${usagePct}%`, background: usageBarColor }} />
+          </div>
+        </div>
+      </div>
 
       {/* Tree + detail */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader>
-              <CardTitle>{t('budgets.tree.title')}</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>{t('budgets.tree.title')}</CardTitle></CardHeader>
             <CardContent>
               {loading ? (
                 <div className="space-y-2">
@@ -113,7 +100,6 @@ export default function BudgetsPage() {
           </Card>
         </div>
 
-        {/* Detail */}
         <div>
           {selected ? (
             <Card className="sticky top-4">
@@ -124,57 +110,49 @@ export default function BudgetsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Visual spend bar */}
                 {(() => {
-                  const pct = selected.total > 0 ? Math.min((selected.spent / selected.total) * 100, 100) : 0;
-                  const ratio = selected.total > 0 ? selected.spent / selected.total : 0;
-                  const barColor = ratio >= 1 ? 'bg-red-500' : ratio >= 0.85 ? 'bg-yellow-400' : 'bg-green-500';
+                  const pct      = selected.total > 0 ? Math.min((selected.spent / selected.total) * 100, 100) : 0;
+                  const ratio    = selected.total > 0 ? selected.spent / selected.total : 0;
+                  const barColor = ratio >= 1 ? 'var(--blocked)' : ratio >= 0.85 ? 'var(--warning)' : 'var(--success)';
                   return (
-                    <div className="rounded-lg bg-neutral-50 dark:bg-neutral-700/50 p-3">
+                    <div className="rounded-lg p-3" style={{ background: 'var(--card-mid)' }}>
                       <div className="flex justify-between text-sm mb-2">
-                        <span className="font-semibold text-neutral-900 dark:text-neutral-50">
-                          ${selected.spent.toLocaleString()}
-                        </span>
-                        <span className="text-neutral-500">${selected.total.toLocaleString()}</span>
+                        <span className="font-semibold" style={{ color: 'var(--text)' }}>${selected.spent.toLocaleString()}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>${selected.total.toLocaleString()}</span>
                       </div>
-                      <div className="h-2 w-full rounded-full bg-neutral-200 dark:bg-neutral-600 overflow-hidden">
-                        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                      <div className="h-2 w-full rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
                       </div>
-                      <p className="text-xs text-neutral-400 mt-1">{Math.round(pct)}% {t('budgets.detail.used')}</p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{Math.round(pct)}% {t('budgets.detail.used')}</p>
                     </div>
                   );
                 })()}
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-neutral-500">{t('budgets.detail.available')}</span>
-                    <span className={`font-semibold ${selected.total - selected.spent >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    <span style={{ color: 'var(--text-muted)' }}>{t('budgets.detail.available')}</span>
+                    <span className="font-semibold" style={{ color: selected.total - selected.spent >= 0 ? 'var(--success)' : 'var(--blocked)' }}>
                       ${Math.max(0, selected.total - selected.spent).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-neutral-500">{t('budgets.detail.period')}</span>
-                    <span className="font-semibold capitalize">{selected.period}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{t('budgets.detail.period')}</span>
+                    <span className="font-semibold capitalize" style={{ color: 'var(--text)' }}>{selected.period}</span>
                   </div>
                   {selected.children && (
                     <div className="flex justify-between">
-                      <span className="text-neutral-500">{t('budgets.detail.subcategories')}</span>
-                      <span className="font-semibold">{selected.children.length}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{t('budgets.detail.subcategories')}</span>
+                      <span className="font-semibold" style={{ color: 'var(--text)' }}>{selected.children.length}</span>
                     </div>
                   )}
                 </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  fullWidth
-                  onClick={() => setShowCreate(true)}
-                >
+                <Button variant="secondary" size="sm" fullWidth onClick={() => setShowCreate(true)}>
                   {t('budgets.detail.add_sub')}
                 </Button>
               </CardContent>
             </Card>
           ) : (
             <Card>
-              <CardContent className="text-center py-8 text-neutral-400 text-sm">
+              <CardContent className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
                 {t('budgets.detail.click_prompt')}
               </CardContent>
             </Card>
@@ -182,7 +160,6 @@ export default function BudgetsPage() {
         </div>
       </div>
 
-      {/* Modal */}
       <CreateBudgetModal
         open={showCreate}
         onClose={() => setShowCreate(false)}

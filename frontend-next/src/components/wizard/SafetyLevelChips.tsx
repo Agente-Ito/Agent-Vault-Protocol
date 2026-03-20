@@ -18,10 +18,13 @@ const LEVELS: { key: SafetyLevel; color: string }[] = [
 
 export function SafetyLevelChips({ value, onChange }: SafetyLevelChipsProps) {
   const { t } = useI18n();
+  const [showMore, setShowMore] = React.useState(value !== 'safe');
+
+  const visibleLevels = showMore ? LEVELS : LEVELS.slice(0, 1);
 
   return (
     <div className="space-y-2">
-      {LEVELS.map(({ key, color }) => {
+      {visibleLevels.map(({ key, color }) => {
         const active = value === key;
         return (
           <button
@@ -44,11 +47,6 @@ export function SafetyLevelChips({ value, onChange }: SafetyLevelChipsProps) {
             <div>
               <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
                 {t(`wizard.automation.safety.${key}` as Parameters<typeof t>[0])}
-                {key === 'safe' && (
-                  <span className="ml-2 text-xs font-normal px-1.5 py-0.5 rounded" style={{ background: 'var(--success)', color: '#000' }}>
-                    ✓ Recommended
-                  </span>
-                )}
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                 {t(`wizard.automation.safety.${key}_desc` as Parameters<typeof t>[0])}
@@ -62,6 +60,15 @@ export function SafetyLevelChips({ value, onChange }: SafetyLevelChipsProps) {
           </button>
         );
       })}
+
+      <button
+        type="button"
+        onClick={() => setShowMore((prev) => !prev)}
+        className="text-xs font-medium transition-opacity hover:opacity-80"
+        style={{ color: 'var(--accent)' }}
+      >
+        {t(showMore ? 'wizard.automation.safety.less_options' : 'wizard.automation.safety.more_options')}
+      </button>
     </div>
   );
 }

@@ -15,39 +15,26 @@ import { useContacts, CATEGORY_META } from '@/hooks/useContacts';
 
 interface AgentEvent { type: 'LYX' | 'TOKEN'; to: string; token?: string; amount: string; txHash: string; blockNumber: number; }
 interface SafePaymentLog {
-  args?: {
-    to?: string;
-    token?: string;
-    amount?: bigint;
-  };
+  args?: { to?: string; token?: string; amount?: bigint; };
   transactionHash: string;
   blockNumber: number;
 }
 
-function short(addr: string) {
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-}
+function short(addr: string) { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 
 export default function ActivityPage() {
   const { registry, account, isConnected, chainId } = useWeb3();
   const { vaults, loading: vaultsLoading } = useVaults(registry, account);
   const [events, setEvents] = useState<(AgentEvent & { vaultLabel: string })[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const { t } = useI18n();
 
   useEffect(() => {
-    if (!vaults.length) {
-      setEvents([]);
-      setWarning(null);
-      return;
-    }
-
+    if (!vaults.length) { setEvents([]); setWarning(null); return; }
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setWarning(null);
+    setLoading(true); setError(null); setWarning(null);
     const provider = getProvider();
 
     Promise.all(
@@ -60,28 +47,11 @@ export default function ActivityPage() {
           ]);
           const lyxEvents: (AgentEvent & { vaultLabel: string })[] = lyxLogs.map((raw) => {
             const event = raw as SafePaymentLog;
-
-            return {
-            type: 'LYX' as const,
-            to: event.args?.to ?? '',
-            amount: ethers.formatEther(event.args?.amount ?? BigInt(0)),
-            txHash: event.transactionHash,
-            blockNumber: event.blockNumber,
-            vaultLabel: vault.label || short(vault.safe),
-          };
+            return { type: 'LYX' as const, to: event.args?.to ?? '', amount: ethers.formatEther(event.args?.amount ?? BigInt(0)), txHash: event.transactionHash, blockNumber: event.blockNumber, vaultLabel: vault.label || short(vault.safe) };
           });
           const tokenEvents: (AgentEvent & { vaultLabel: string })[] = tokenLogs.map((raw) => {
             const event = raw as SafePaymentLog;
-
-            return {
-            type: 'TOKEN' as const,
-            to: event.args?.to ?? '',
-            token: event.args?.token ?? '',
-            amount: ethers.formatEther(event.args?.amount ?? BigInt(0)),
-            txHash: event.transactionHash,
-            blockNumber: event.blockNumber,
-            vaultLabel: vault.label || short(vault.safe),
-          };
+            return { type: 'TOKEN' as const, to: event.args?.to ?? '', token: event.args?.token ?? '', amount: ethers.formatEther(event.args?.amount ?? BigInt(0)), txHash: event.transactionHash, blockNumber: event.blockNumber, vaultLabel: vault.label || short(vault.safe) };
           });
           return { events: [...lyxEvents, ...tokenEvents], failed: false };
         } catch {
@@ -90,14 +60,8 @@ export default function ActivityPage() {
       })
     )
       .then((perVault) => {
-        if (cancelled) {
-          return;
-        }
-
-        const allEvents = perVault
-          .flatMap((r) => r.events)
-          .sort((a, b) => b.blockNumber - a.blockNumber)
-          .slice(0, 100);
+        if (cancelled) return;
+        const allEvents = perVault.flatMap((r) => r.events).sort((a, b) => b.blockNumber - a.blockNumber).slice(0, 100);
         const anyFailed = perVault.some((r) => r.failed);
         const failedCount = perVault.filter((r) => r.failed).length;
         if (anyFailed && allEvents.length === 0) {
@@ -107,20 +71,10 @@ export default function ActivityPage() {
         }
         setEvents(allEvents);
       })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err.message ?? String(err));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
+      .catch((err) => { if (!cancelled) setError(err.message ?? String(err)); })
+      .finally(() => { if (!cancelled) setLoading(false); });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [vaults]);
 
   const { findContact } = useContacts();
@@ -129,10 +83,8 @@ export default function ActivityPage() {
   return (
     <div className="space-y-lg">
       <div>
-        <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50">{t('activity.title')}</h1>
-        <p className="text-neutral-600 dark:text-neutral-400 mt-xs">
-          {t('activity.subtitle')}
-        </p>
+        <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{t('activity.title')}</h1>
+        <p className="mt-xs" style={{ color: 'var(--text-muted)' }}>{t('activity.subtitle')}</p>
       </div>
 
       <Card>
@@ -142,29 +94,19 @@ export default function ActivityPage() {
         </CardHeader>
         <CardContent>
           {!isConnected && (
-            <Alert variant="info">
-              <AlertDescription>{t('activity.connect_prompt')}</AlertDescription>
-            </Alert>
+            <Alert variant="info"><AlertDescription>{t('activity.connect_prompt')}</AlertDescription></Alert>
           )}
-
           {isConnected && isAnyLoading && (
-            <div className="space-y-sm">
-              <SkeletonRow /><SkeletonRow /><SkeletonRow />
-            </div>
+            <div className="space-y-sm"><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
           )}
-
           {isConnected && error && (
-            <p className="text-danger text-sm">Error: {error}</p>
+            <p className="text-sm" style={{ color: 'var(--blocked)' }}>Error: {error}</p>
           )}
-
           {isConnected && !error && warning && (
-            <Alert variant="warning" className="mb-md">
-              <AlertDescription>{warning}</AlertDescription>
-            </Alert>
+            <Alert variant="warning" className="mb-md"><AlertDescription>{warning}</AlertDescription></Alert>
           )}
-
           {isConnected && !isAnyLoading && events.length === 0 && (
-            <p className="text-neutral-600 dark:text-neutral-400">{t('activity.empty')}</p>
+            <p style={{ color: 'var(--text-muted)' }}>{t('activity.empty')}</p>
           )}
 
           {events.length > 0 && (
@@ -176,48 +118,50 @@ export default function ActivityPage() {
                   : short(ev.to);
                 return (
                   <div key={`${ev.txHash}-${i}`} className="flex items-start gap-3">
-                    {/* Timeline icon + connector */}
                     <div className="flex flex-col items-center flex-shrink-0">
-                      <div className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-base">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-base"
+                        style={{ background: 'var(--card-mid)' }}
+                      >
                         {ev.type === 'LYX' ? '⚡' : '🪙'}
                       </div>
                       {i < events.length - 1 && (
-                        <div className="w-px h-4 bg-neutral-200 dark:bg-neutral-700 mt-1" />
+                        <div className="w-px h-4 mt-1" style={{ background: 'var(--border)' }} />
                       )}
                     </div>
-
-                    {/* Content */}
                     <div className="flex-1 pb-1">
                       <div className="flex items-baseline justify-between gap-2">
                         <div>
-                          <span className="text-sm font-medium text-neutral-900 dark:text-neutral-50">
+                          <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
                             {parseFloat(ev.amount).toFixed(4)} {ev.type === 'LYX' ? 'LYX' : 'tokens'}
                             {' → '}
-                            <span className={toContact ? 'text-primary-600 dark:text-primary-400' : ''}>
-                              {toLabel}
-                            </span>
+                            <span style={toContact ? { color: 'var(--primary)' } : undefined}>{toLabel}</span>
                           </span>
-                          <span className="text-xs text-neutral-400 ml-1.5">• {ev.vaultLabel}</span>
+                          <span className="text-xs ml-1.5" style={{ color: 'var(--text-muted)' }}>• {ev.vaultLabel}</span>
                         </div>
                         <a
                           href={`https://explorer.execution.${chainId === 42 ? 'mainnet' : 'testnet'}.lukso.network/tx/${ev.txHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline flex-shrink-0"
+                          className="text-xs hover:underline flex-shrink-0"
+                          style={{ color: 'var(--primary)' }}
                         >
                           {t('activity.view')}
                         </a>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-xs text-neutral-400">Block {ev.blockNumber}</span>
-                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-50 text-green-600 dark:bg-green-900/40 dark:text-green-300">
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Block {ev.blockNumber}</span>
+                        <span
+                          className="text-xs px-1.5 py-0.5 rounded-full"
+                          style={{ background: 'rgba(34,255,178,0.1)', color: 'var(--success)' }}
+                        >
                           {t('timeline.status.completed')}
                         </span>
                         {toContact && (
-                          <span className="text-xs font-mono text-neutral-400">{short(ev.to)}</span>
+                          <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{short(ev.to)}</span>
                         )}
                         {ev.type === 'TOKEN' && ev.token && (
-                          <span className="text-xs font-mono text-neutral-400">{short(ev.token)}</span>
+                          <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{short(ev.token)}</span>
                         )}
                       </div>
                     </div>

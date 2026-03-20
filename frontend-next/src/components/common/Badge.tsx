@@ -1,40 +1,35 @@
 import React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils/cn';
 
-const badgeVariants = cva(
-  'inline-flex items-center rounded-full px-xs py-xs text-xs font-semibold whitespace-nowrap',
-  {
-    variants: {
-      variant: {
-        primary: 'bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-200',
-        success: 'bg-green-50 text-green-700 dark:bg-green-900 dark:text-green-200',
-        warning: 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200',
-        danger: 'bg-red-50 text-red-700 dark:bg-red-900 dark:text-red-200',
-        neutral: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300',
-      },
-    },
-    defaultVariants: {
-      variant: 'neutral',
-    },
-  }
-);
+const VARIANT_STYLES: Record<string, React.CSSProperties> = {
+  primary: { background: 'rgba(123,97,255,0.15)', color: 'var(--primary)' },
+  success: { background: 'rgba(34,255,178,0.12)', color: 'var(--success)' },
+  warning: { background: 'rgba(255,200,87,0.12)', color: 'var(--warning)' },
+  danger:  { background: 'rgba(255,77,109,0.12)', color: 'var(--blocked)' },
+  neutral: { background: 'var(--card-mid)', color: 'var(--text-muted)', border: '1px solid var(--border)' },
+};
 
-interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof badgeVariants> {}
+type Variant = keyof typeof VARIANT_STYLES;
+
+interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: Variant;
+}
 
 const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
-  ({ className, variant, ...props }, ref) => (
+  ({ className, variant = 'neutral', style, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn(badgeVariants({ variant }), className)}
+      className={cn('inline-flex items-center rounded-full px-xs py-xs text-xs font-semibold whitespace-nowrap', className)}
+      style={{ ...VARIANT_STYLES[variant], ...style }}
       {...props}
     />
   )
 );
 
 Badge.displayName = 'Badge';
+
+// Keep for backward compat
+const badgeVariants = () => '';
 
 export { Badge, badgeVariants };
 export type { BadgeProps };

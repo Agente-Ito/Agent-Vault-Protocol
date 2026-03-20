@@ -21,6 +21,7 @@ import { lookupBasename, BASENAME_CHAINS } from '@/lib/web3/basename';
 
 const PAGE_META: Record<string, { titleKey: string; ctaLabelKey?: string; ctaHref?: string }> = {
   '/dashboard':     { titleKey: 'nav.dashboard' },
+  '/setup':         { titleKey: 'nav.setup_cta' },
   '/vaults':        { titleKey: 'nav.spaces',         ctaLabelKey: 'vaults.create', ctaHref: '/vaults/create' },
   '/vaults/create': { titleKey: 'create.title' },
   '/rules':         { titleKey: 'nav.spending_rules' },

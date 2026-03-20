@@ -60,7 +60,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
   }, [signer]);
 
   const connect = async () => {
-    const upConnector = connectors.find((c) => c.id === 'universalProfile');
+    const upConnector = connectors.find((c) => c.id === 'xyz.universal.profile');
     if (upConnector && hasUPExtension) {
       await connectAsync({ connector: upConnector });
     }

@@ -39,7 +39,7 @@ function EmptyAgents({ onEnable }: { onEnable: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
       <span className="text-4xl">🤖</span>
-      <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-xs">
+      <p className="text-sm max-w-xs" style={{ color: 'var(--text-muted)' }}>
         {t('dashboard.empty.agents')}
       </p>
       <Button size="sm" variant="secondary" onClick={onEnable}>
@@ -54,7 +54,7 @@ function EmptyTimeline({ onEnable }: { onEnable: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
       <span className="text-4xl">📅</span>
-      <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-xs">
+      <p className="text-sm max-w-xs" style={{ color: 'var(--text-muted)' }}>
         {t('dashboard.empty.timeline')}
       </p>
       <Button size="sm" variant="secondary" onClick={onEnable}>
@@ -69,7 +69,7 @@ function EmptyBudgetTree({ onEnable }: { onEnable: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
       <span className="text-4xl">💰</span>
-      <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-xs">
+      <p className="text-sm max-w-xs" style={{ color: 'var(--text-muted)' }}>
         {t('dashboard.empty.budget')}
       </p>
       <Button size="sm" variant="secondary" onClick={onEnable}>
@@ -152,7 +152,7 @@ export default function DashboardPage() {
   const { isAdvanced } = useMode();
   const { registry, account, isConnected, connect } = useWeb3();
   const { vaults, loading: vaultsLoading } = useVaults(registry, account);
-  const { open: openOnboarding, completed: onboardingCompleted } = useOnboarding();
+  const { completed: onboardingCompleted, setWizardMode } = useOnboarding();
   const { isDemo, enableDemo, demoBudgetNodes, demoAgents, demoEvents } = useDemo();
 
   const [totalBalance, setTotalBalance] = useState<string | null>(null);
@@ -175,11 +175,17 @@ export default function DashboardPage() {
       !onboardingTriggered.current
     ) {
       onboardingTriggered.current = true;
-      openOnboarding();
+      if (isAdvanced) {
+        setWizardMode('expert');
+        router.push('/vaults/create');
+      } else {
+        setWizardMode('simple');
+        router.push('/setup');
+      }
     }
     // Reset so it can trigger again if user disconnects and reconnects
     if (!isConnected) onboardingTriggered.current = false;
-  }, [isConnected, vaultsLoading, vaults.length, isDemo, onboardingCompleted, openOnboarding]);
+  }, [isConnected, vaultsLoading, vaults.length, isDemo, onboardingCompleted, isAdvanced, router, setWizardMode]);
 
   // ── Load vault balances ────────────────────────────────────────────────────
   const loadBalances = useCallback(async () => {
@@ -260,7 +266,7 @@ export default function DashboardPage() {
               ) : (
                 <Button size="sm" onClick={connect}>{t('dashboard.connect_wallet_btn')}</Button>
               )}
-              <Button variant="secondary" size="sm" onClick={openOnboarding}>
+              <Button variant="secondary" size="sm" onClick={() => router.push('/setup')}>
                 {t('nav.setup_cta')}
               </Button>
             </div>
@@ -324,6 +330,31 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* ─── Expert Mode entry point ───────────────────────────────────── */}
+        <div
+          className="rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+          style={{
+            background: 'linear-gradient(135deg, rgba(123,97,255,0.1) 0%, rgba(60,242,255,0.05) 100%)',
+            border: '1px solid rgba(123,97,255,0.3)',
+          }}
+        >
+          <div className="space-y-0.5">
+            <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+              {t('dashboard.expert_banner.title')}
+            </p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              {t('dashboard.expert_banner.desc')}
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/settings')}
+            className="whitespace-nowrap text-sm font-semibold px-4 py-2 rounded-xl transition-opacity hover:opacity-85 flex-shrink-0"
+            style={{ background: 'var(--primary)', color: '#fff' }}
+          >
+            {t('dashboard.expert_banner.cta')}
+          </button>
+        </div>
       </div>
     );
   }
@@ -343,27 +374,33 @@ export default function DashboardPage() {
       {/* ─── Header: Balance total ─── */}
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-1">{t('dashboard.total_balance')}</p>
+          <p className="text-sm mb-1" style={{ color: 'var(--text-muted)' }}>{t('dashboard.total_balance')}</p>
           {loading ? (
             <Skeleton className="h-9 w-40" />
           ) : (
             <div className="flex items-baseline gap-3">
-              <h1 className="text-4xl font-bold text-neutral-900 dark:text-neutral-50">
+              <h1 className="text-4xl font-bold" style={{ color: 'var(--text)' }}>
                 {balanceDisplay}
               </h1>
               {isDemo && (
-                <span className="text-sm font-medium text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
+                <span
+                  className="text-sm font-medium px-2 py-0.5 rounded-full"
+                  style={{ color: 'var(--warning)', background: 'rgba(255,200,87,0.12)' }}
+                >
                   {t('demo.label')}
                 </span>
               )}
               {!isDemo && isConnected && (
-                <span className="text-sm font-medium text-green-500 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
+                <span
+                  className="text-sm font-medium px-2 py-0.5 rounded-full"
+                  style={{ color: 'var(--success)', background: 'rgba(34,255,178,0.1)' }}
+                >
                   ↑ 3%
                 </span>
               )}
             </div>
           )}
-          <p className="text-xs text-neutral-400 mt-1">
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
             {t('dashboard.this_month')} · {vaultCount} {t('dashboard.active_vaults')}
           </p>
         </div>
@@ -432,16 +469,19 @@ export default function DashboardPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-1">
                   <div className="flex justify-between text-sm">
-                    <span className="text-neutral-500">{t('dashboard.detail.spent')}</span>
-                    <span className="font-semibold text-neutral-900 dark:text-neutral-50">${selectedNode.spent.toLocaleString()}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{t('dashboard.detail.spent')}</span>
+                    <span className="font-semibold" style={{ color: 'var(--text)' }}>${selectedNode.spent.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-neutral-500">{t('dashboard.detail.limit')}</span>
-                    <span className="font-semibold text-neutral-900 dark:text-neutral-50">${selectedNode.total.toLocaleString()}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{t('dashboard.detail.limit')}</span>
+                    <span className="font-semibold" style={{ color: 'var(--text)' }}>${selectedNode.total.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-neutral-500">{t('dashboard.detail.available')}</span>
-                    <span className={`font-semibold ${selectedNode.total - selectedNode.spent >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    <span style={{ color: 'var(--text-muted)' }}>{t('dashboard.detail.available')}</span>
+                    <span
+                      className="font-semibold"
+                      style={{ color: selectedNode.total - selectedNode.spent >= 0 ? 'var(--success)' : 'var(--blocked)' }}
+                    >
                       ${Math.max(0, selectedNode.total - selectedNode.spent).toLocaleString()}
                     </span>
                   </div>
@@ -455,7 +495,7 @@ export default function DashboardPage() {
             </Card>
           ) : (
             <Card>
-              <CardContent className="text-center py-8 text-neutral-400 text-sm">
+              <CardContent className="text-center py-8 text-sm" style={{ color: 'var(--text-muted)' }}>
                 {budgetNodes.length > 0 ? t('dashboard.click_category') : t('dashboard.empty.no_selection')}
               </CardContent>
             </Card>

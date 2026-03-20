@@ -2,17 +2,11 @@ import React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils/cn';
 
-const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+// Structural classes only — colors handled via style prop
+const buttonBase = cva(
+  'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:opacity-85 active:opacity-70',
   {
     variants: {
-      variant: {
-        primary: 'bg-primary text-white hover:bg-blue-600 active:bg-blue-700',
-        secondary: 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 active:bg-neutral-300',
-        ghost: 'text-primary hover:bg-blue-50 active:bg-blue-100',
-        danger: 'bg-danger text-white hover:bg-red-600 active:bg-red-700',
-        success: 'bg-success text-white hover:bg-emerald-600 active:bg-emerald-700',
-      },
       size: {
         sm: 'h-8 px-3 text-xs',
         md: 'h-10 px-4 text-sm',
@@ -24,27 +18,42 @@ const buttonVariants = cva(
       },
     },
     defaultVariants: {
-      variant: 'primary',
       size: 'md',
     },
   }
 );
 
+const VARIANT_STYLES: Record<string, React.CSSProperties> = {
+  primary:   { background: 'var(--primary)',  color: '#fff' },
+  secondary: { background: 'var(--card-mid)', color: 'var(--text)', border: '1px solid var(--border)' },
+  ghost:     { background: 'transparent',     color: 'var(--primary)' },
+  danger:    { background: 'var(--blocked)',  color: '#fff' },
+  success:   { background: 'var(--success)',  color: '#000' },
+};
+
+type Variant = keyof typeof VARIANT_STYLES;
+
 interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonBase> {
+  variant?: Variant;
+}
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, fullWidth, ...props }, ref) => (
+  ({ className, variant = 'primary', size, fullWidth, style, ...props }, ref) => (
     <button
       ref={ref}
-      className={cn(buttonVariants({ variant, size, fullWidth }), className)}
+      className={cn(buttonBase({ size, fullWidth }), className)}
+      style={{ ...VARIANT_STYLES[variant], ...style }}
       {...props}
     />
   )
 );
 
 Button.displayName = 'Button';
+
+// Keep export for backward compat (not used externally but avoids import errors)
+const buttonVariants = buttonBase;
 
 export { Button, buttonVariants };
 export type { ButtonProps };

@@ -3,16 +3,16 @@ import { cn } from '@/lib/utils/cn';
 
 type SkeletonProps = React.HTMLAttributes<HTMLDivElement>;
 
-export function Skeleton({ className, ...props }: SkeletonProps) {
+export function Skeleton({ className, style, ...props }: SkeletonProps) {
   return (
     <div
-      className={cn('animate-pulse rounded bg-neutral-200 dark:bg-neutral-700', className)}
+      className={cn('animate-pulse rounded', className)}
+      style={{ background: 'var(--card-mid)', ...style }}
       {...props}
     />
   );
 }
 
-// Pre-built skeleton layouts for common patterns
 export function SkeletonStatCard() {
   return (
     <div className="space-y-sm">
@@ -37,7 +37,10 @@ export function SkeletonRow() {
 
 export function SkeletonCard() {
   return (
-    <div className="space-y-md p-md border border-neutral-200 dark:border-neutral-700 rounded-md">
+    <div
+      className="space-y-md p-md rounded-xl"
+      style={{ border: '1px solid var(--border)', background: 'var(--card)' }}
+    >
       <div className="flex justify-between items-start">
         <div className="space-y-xs">
           <Skeleton className="h-5 w-36" />

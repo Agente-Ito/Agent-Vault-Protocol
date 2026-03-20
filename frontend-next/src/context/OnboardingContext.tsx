@@ -5,11 +5,25 @@ import type { EntityType } from '@/lib/onboarding/entityData';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type GoalKey = 'pay_people' | 'pay_vendors' | 'subscriptions' | 'save_funds';
+export type GoalKey =
+  | 'pay_people'
+  | 'pay_vendors'
+  | 'subscriptions'
+  | 'save_funds'
+  | 'payroll'
+  | 'grants'
+  | 'treasury_rebalance'
+  | 'tax_reserve';
 export type SafetyLevel = 'safe' | 'flexible' | 'advanced';
 export type ExecutorType = 'me' | 'vaultia' | 'my_agent';
 export type WizardMode = 'simple' | 'expert';
 export type FrequencyKey = 'daily' | 'weekly' | 'monthly';
+export type RecipientNetwork = 'up' | 'base';
+
+export interface RecipientEntry {
+  address: string;
+  label?: string;
+}
 
 interface OnboardingState {
   step: number;           // 0-4
@@ -30,8 +44,10 @@ interface OnboardingState {
 
   // ── New wizard fields (simple flow) ──────────────────────────────────────
   wizardMode: WizardMode;
+  wizardVaultName: string;
   goal: GoalKey | null;
-  recipients: string[];
+  recipientNetwork: RecipientNetwork;
+  recipients: RecipientEntry[];
   maxPerTx: string;
   frequency: FrequencyKey;
   agentEnabled: boolean;
@@ -55,9 +71,11 @@ interface OnboardingContextType extends OnboardingState {
   setBudgetPeriod: (p: 'daily' | 'weekly' | 'monthly') => void;
   // New simple wizard setters
   setWizardMode: (m: WizardMode) => void;
+  setWizardVaultName: (s: string) => void;
   setGoal: (g: GoalKey | null) => void;
-  addRecipient: (r: string) => void;
-  removeRecipient: (r: string) => void;
+  setRecipientNetwork: (n: RecipientNetwork) => void;
+  addRecipient: (r: RecipientEntry) => void;
+  removeRecipient: (address: string) => void;
   setMaxPerTx: (s: string) => void;
   setFrequency: (f: FrequencyKey) => void;
   setAgentEnabled: (v: boolean) => void;
@@ -76,8 +94,10 @@ export const MAX_STEPS = 5;
 
 const WIZARD_DEFAULTS = {
   wizardMode: 'simple' as WizardMode,
+  wizardVaultName: '',
   goal: null as GoalKey | null,
-  recipients: [] as string[],
+  recipientNetwork: 'up' as RecipientNetwork,
+  recipients: [] as RecipientEntry[],
   maxPerTx: '',
   frequency: 'monthly' as FrequencyKey,
   agentEnabled: true,
@@ -92,6 +112,25 @@ function loadWizardProgress(): Partial<typeof WIZARD_DEFAULTS> {
   } catch {
     return {};
   }
+}
+
+function normalizeStoredRecipients(value: unknown): RecipientEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (typeof entry === 'string') {
+      return entry ? [{ address: entry }] : [];
+    }
+    if (typeof entry === 'object' && entry !== null && 'address' in entry) {
+      const address = (entry as { address?: unknown }).address;
+      const label = (entry as { label?: unknown }).label;
+      if (typeof address !== 'string' || !address) return [];
+      return [{
+        address,
+        label: typeof label === 'string' && label.trim() ? label : undefined,
+      }];
+    }
+    return [];
+  });
 }
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -113,9 +152,11 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [budgetPeriod, setBudgetPeriodState]   = useState<'daily' | 'weekly' | 'monthly'>('monthly');
 
   // New wizard fields
-  const [wizardMode, setWizardModeState]       = useState<WizardMode>(WIZARD_DEFAULTS.wizardMode);
-  const [goal, setGoalState]                   = useState<GoalKey | null>(WIZARD_DEFAULTS.goal);
-  const [recipients, setRecipients]            = useState<string[]>(WIZARD_DEFAULTS.recipients);
+  const [wizardMode, setWizardModeState]           = useState<WizardMode>(WIZARD_DEFAULTS.wizardMode);
+  const [wizardVaultName, setWizardVaultNameState] = useState<string>(WIZARD_DEFAULTS.wizardVaultName);
+  const [goal, setGoalState]                       = useState<GoalKey | null>(WIZARD_DEFAULTS.goal);
+  const [recipientNetwork, setRecipientNetworkState] = useState<RecipientNetwork>(WIZARD_DEFAULTS.recipientNetwork);
+  const [recipients, setRecipients]            = useState<RecipientEntry[]>(WIZARD_DEFAULTS.recipients);
   const [maxPerTx, setMaxPerTxState]           = useState<string>(WIZARD_DEFAULTS.maxPerTx);
   const [frequency, setFrequencyState]         = useState<FrequencyKey>(WIZARD_DEFAULTS.frequency);
   const [agentEnabled, setAgentEnabledState]   = useState<boolean>(WIZARD_DEFAULTS.agentEnabled);
@@ -127,12 +168,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     const isDismissed = localStorage.getItem(STORAGE_DISMISSED) === 'true';
     setCompleted(isCompleted);
     setDismissed(isDismissed);
-    if (!isCompleted && !isDismissed) setVisible(true);
 
     // Restore wizard progress
     const saved = loadWizardProgress();
+    if (saved.wizardVaultName !== undefined) setWizardVaultNameState(saved.wizardVaultName);
     if (saved.goal)         setGoalState(saved.goal);
-    if (saved.recipients)   setRecipients(saved.recipients);
+    if (saved.recipientNetwork) setRecipientNetworkState(saved.recipientNetwork);
+    if (saved.recipients)   setRecipients(normalizeStoredRecipients(saved.recipients));
     if (saved.maxPerTx)     setMaxPerTxState(saved.maxPerTx);
     if (saved.frequency)    setFrequencyState(saved.frequency);
     if (saved.wizardMode)   setWizardModeState(saved.wizardMode);
@@ -148,10 +190,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     if (!hydrated) return;
     try {
       localStorage.setItem(STORAGE_WIZARD, JSON.stringify({
-        goal, recipients, maxPerTx, frequency, wizardMode, executor, safetyLevel, agentEnabled,
+        wizardVaultName, goal, recipientNetwork, recipients, maxPerTx, frequency, wizardMode, executor, safetyLevel, agentEnabled,
       }));
     } catch { /* ignore */ }
-  }, [goal, recipients, maxPerTx, frequency, wizardMode, executor, safetyLevel, agentEnabled, hydrated]);
+  }, [wizardVaultName, goal, recipientNetwork, recipients, maxPerTx, frequency, wizardMode, executor, safetyLevel, agentEnabled, hydrated]);
 
   const open = useCallback(() => {
     setVisible(true);
@@ -202,10 +244,20 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const setBudgetPeriod = useCallback((p: 'daily' | 'weekly' | 'monthly') => setBudgetPeriodState(p), []);
 
   // New wizard setters
-  const setWizardMode   = useCallback((m: WizardMode) => setWizardModeState(m), []);
-  const setGoal         = useCallback((g: GoalKey | null) => setGoalState(g), []);
-  const addRecipient    = useCallback((r: string) => setRecipients((prev) => prev.includes(r) ? prev : [...prev, r]), []);
-  const removeRecipient = useCallback((r: string) => setRecipients((prev) => prev.filter((x) => x !== r)), []);
+  const setWizardMode       = useCallback((m: WizardMode) => setWizardModeState(m), []);
+  const setWizardVaultName  = useCallback((s: string) => setWizardVaultNameState(s), []);
+  const setGoal             = useCallback((g: GoalKey | null) => setGoalState(g), []);
+  const setRecipientNetwork = useCallback((n: RecipientNetwork) => setRecipientNetworkState(n), []);
+  const addRecipient    = useCallback((recipient: RecipientEntry) => {
+    setRecipients((prev) =>
+      prev.some((entry) => entry.address.toLowerCase() === recipient.address.toLowerCase())
+        ? prev
+        : [...prev, recipient]
+    );
+  }, []);
+  const removeRecipient = useCallback((address: string) => {
+    setRecipients((prev) => prev.filter((entry) => entry.address.toLowerCase() !== address.toLowerCase()));
+  }, []);
   const setMaxPerTx     = useCallback((s: string) => setMaxPerTxState(s), []);
   const setFrequency    = useCallback((f: FrequencyKey) => setFrequencyState(f), []);
   const setAgentEnabled = useCallback((v: boolean) => setAgentEnabledState(v), []);
@@ -218,12 +270,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         step, visible: hydrated && visible, completed, dismissed,
         entityType, entityProfile, vaultName, vaultEmoji,
         selectedSubVaults, rootBudget, budgetPeriod,
-        wizardMode, goal, recipients, maxPerTx, frequency,
+        wizardMode, wizardVaultName, goal, recipientNetwork, recipients, maxPerTx, frequency,
         agentEnabled, executor, safetyLevel,
         open, close, next, back, finish, dismissPermanently,
         setEntityType, setEntityProfile, setVaultName, setVaultEmoji,
         toggleSubVault, setRootBudget, setBudgetPeriod,
-        setWizardMode, setGoal, addRecipient, removeRecipient,
+        setWizardMode, setWizardVaultName, setGoal, setRecipientNetwork, addRecipient, removeRecipient,
         setMaxPerTx, setFrequency, setAgentEnabled, setExecutor, setSafetyLevel,
       }}
     >

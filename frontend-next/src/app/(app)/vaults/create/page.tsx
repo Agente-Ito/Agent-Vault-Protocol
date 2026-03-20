@@ -4,11 +4,11 @@ export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { ethers } from 'ethers';
 import { createPublicClient, custom } from 'viem';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/common/Card';
-import { Button } from '@/components/common/Button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/common/Alert';
+import { Button } from '@/components/common/Button';
 import { ProfilePicker } from '@/components/profiles/ProfilePicker';
 import { useWeb3 } from '@/context/Web3Context';
 import { useI18n } from '@/context/I18nContext';
@@ -65,7 +65,7 @@ interface Eip1193ProviderLike {
   request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
 }
 
-// ─── Template data (display strings via t(), only config values here) ─────────
+// ─── Template data ─────────────────────────────────────────────────────────────
 
 interface TemplateConfig {
   id: string;
@@ -84,34 +84,39 @@ const TEMPLATE_CONFIGS: TemplateConfig[] = [
   { id: 'custom',       budget: '0.5', period: '1', hasExpiry: false, expiryDate: '', agents: '', merchants: '' },
 ];
 
-const TEMPLATE_STYLE: Record<string, { emoji: string; base: string; hover: string; active: string }> = {
-  allowance:    { emoji: '💰', base: 'border-emerald-200 dark:border-emerald-800', hover: 'hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20', active: 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' },
-  defi:         { emoji: '📈', base: 'border-blue-200 dark:border-blue-800',       hover: 'hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20',           active: 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' },
-  subscription: { emoji: '🔄', base: 'border-orange-200 dark:border-orange-800',   hover: 'hover:border-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20',     active: 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' },
-  custom:       { emoji: '⚙️', base: 'border-violet-200 dark:border-violet-800',   hover: 'hover:border-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20',     active: 'border-violet-500 bg-violet-50 dark:bg-violet-900/20' },
+const TEMPLATE_ICON: Record<string, string> = {
+  allowance: '✦', defi: '◈', subscription: '⬡', custom: '⚙',
 };
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
 
 function StepIndicator({ current, steps }: { current: number; steps: string[] }) {
   return (
-    <div className="flex items-center gap-xs">
+    <div className="flex items-center gap-2 flex-wrap">
       {steps.map((label, i) => {
         const num = i + 1;
         const active = num === current;
         const done = num < current;
         return (
-          <div key={label} className="flex items-center gap-xs">
-            <div className={cn(
-              'w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium shrink-0',
-              active ? 'bg-primary text-white' : done ? 'bg-success text-white' : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-500'
-            )}>
+          <div key={label} className="flex items-center gap-2">
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
+              style={{
+                background: done ? 'var(--success)' : active ? 'var(--primary)' : 'var(--card-mid)',
+                color: done || active ? '#fff' : 'var(--text-muted)',
+              }}
+            >
               {done ? '✓' : num}
             </div>
-            <span className={cn('text-xs', active ? 'font-medium text-neutral-900 dark:text-neutral-50' : 'text-neutral-500')}>
+            <span
+              className="text-xs font-medium"
+              style={{ color: active ? 'var(--text)' : 'var(--text-muted)' }}
+            >
               {label}
             </span>
-            {i < steps.length - 1 && <div className="w-6 h-px bg-neutral-200 dark:bg-neutral-700 mx-xs" />}
+            {i < steps.length - 1 && (
+              <div className="w-6 h-px mx-1" style={{ background: 'var(--border)' }} />
+            )}
           </div>
         );
       })}
@@ -119,18 +124,22 @@ function StepIndicator({ current, steps }: { current: number; steps: string[] })
   );
 }
 
-// ─── Live vault preview ───────────────────────────────────────────────────────
-
-const PERIOD_MAP: Record<string, string> = { '0': 'Daily', '1': 'Weekly', '2': 'Monthly' };
+// ─── Vault preview ────────────────────────────────────────────────────────────
 
 function PreviewRow({ icon, label, value, active }: { icon: string; label: string; value: string; active: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-neutral-100 dark:border-neutral-700 last:border-0">
+    <div
+      className="flex items-center justify-between gap-2 py-1.5"
+      style={{ borderBottom: '1px solid var(--border)' }}
+    >
       <div className="flex items-center gap-2">
-        <span className={cn('text-sm', active ? '' : 'opacity-30')}>{icon}</span>
-        <span className="text-xs text-neutral-500 dark:text-neutral-400">{label}</span>
+        <span style={{ opacity: active ? 1 : 0.3 }}>{icon}</span>
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</span>
       </div>
-      <span className={cn('text-xs font-medium', active ? 'text-neutral-900 dark:text-neutral-50' : 'text-neutral-300 dark:text-neutral-600')}>
+      <span
+        className="text-xs font-medium"
+        style={{ color: active ? 'var(--text)' : 'var(--text-muted)', opacity: active ? 1 : 0.4 }}
+      >
         {value}
       </span>
     </div>
@@ -145,108 +154,163 @@ function VaultPreview({
   hasExpiry: boolean; expiryDate: string;
   agentCount: number; merchantCount: number;
   chain: 'lukso' | 'base'; tokenSymbol: string;
-  securityLabel: string;
-  securityRisk: 'low' | 'medium' | 'high';
+  securityLabel: string; securityRisk: 'low' | 'medium' | 'high';
 }) {
+  const { t } = useI18n();
   const budgetNum = parseFloat(budget) || 0;
-  return (
-    <div className="rounded-xl border-2 border-dashed border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-5 space-y-4 sticky top-4">
-      <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">Preview</p>
 
-      {/* Vault identity */}
+  const PERIOD_DISPLAY: Record<string, string> = {
+    '0': t('create.field.period.daily'),
+    '1': t('create.field.period.weekly'),
+    '2': t('create.field.period.monthly'),
+  };
+
+  return (
+    <div
+      className="rounded-2xl p-5 sticky top-4 space-y-4"
+      style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+    >
+      <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+        {t('create.preview.title')}
+      </p>
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-xl">
-          🏦
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-base font-bold flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, var(--primary), var(--accent))', color: '#000' }}
+        >
+          ✦
         </div>
         <div>
-          <p className="text-base font-bold text-neutral-900 dark:text-neutral-50 leading-tight">
-            {vaultLabel || 'Unnamed Vault'}
+          <p className="text-base font-bold leading-tight" style={{ color: 'var(--text)' }}>
+            {vaultLabel || t('create.preview.unnamed')}
           </p>
-          <p className="text-xs text-neutral-400">{chain === 'base' ? '🔵 Base Network' : '🌐 LUKSO Network'}</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {chain === 'base' ? '🔵 Base' : '🌐 LUKSO'}
+          </p>
         </div>
       </div>
-
-      {/* Summary rows */}
       <div>
-        <PreviewRow icon="💰" label="Budget"    value={budgetNum > 0 ? `${budget} ${tokenSymbol}` : '—'}     active={budgetNum > 0} />
-        <PreviewRow icon="📅" label="Period"    value={PERIOD_MAP[period] ?? '—'}                            active={true} />
-        <PreviewRow icon="⏱️" label="Expires"   value={hasExpiry && expiryDate ? new Date(expiryDate).toLocaleDateString() : 'No expiry'} active={hasExpiry && !!expiryDate} />
-        <PreviewRow icon="🛡️" label="Security" value={`${securityLabel}${securityRisk === 'high' ? ' (High Risk)' : ''}`} active={true} />
-        <PreviewRow icon="🏪" label="Merchants" value={merchantCount > 0 ? `${merchantCount} address(es)` : 'Any'} active={merchantCount > 0} />
-        <PreviewRow icon="🤖" label="Agents"    value={agentCount > 0 ? `${agentCount} agent(s)` : 'None yet'} active={agentCount > 0} />
+        <PreviewRow icon="✦" label={t('create.preview.field.budget')}    value={budgetNum > 0 ? `${budget} ${tokenSymbol}` : '—'}                                           active={budgetNum > 0} />
+        <PreviewRow icon="◎" label={t('create.preview.field.period')}    value={PERIOD_DISPLAY[period] ?? '—'}                                                               active={true} />
+        <PreviewRow icon="⏱" label={t('create.preview.field.expires')}   value={hasExpiry && expiryDate ? new Date(expiryDate).toLocaleDateString() : t('create.preview.no_expiry')} active={hasExpiry && !!expiryDate} />
+        <PreviewRow icon="⬡" label={t('create.preview.field.security')}  value={`${securityLabel}${securityRisk === 'high' ? ' ⚠' : ''}`}                                  active={true} />
+        <PreviewRow icon="◍" label={t('create.preview.field.merchants')} value={merchantCount > 0 ? `${merchantCount} ${t('create.preview.addresses')}` : t('create.preview.any')} active={merchantCount > 0} />
+        <PreviewRow icon="◈" label={t('create.preview.field.agents')}    value={agentCount > 0 ? `${agentCount} ${t('create.preview.agents_unit')}` : t('create.preview.none')}     active={agentCount > 0} />
       </div>
     </div>
   );
 }
 
-// ─── Inline field error ───────────────────────────────────────────────────────
+// ─── Field label & error ──────────────────────────────────────────────────────
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label className="block text-xs font-semibold uppercase tracking-widest mb-1.5" style={{ color: 'var(--text-muted)' }}>
+      {children}
+    </label>
+  );
+}
 
 function FieldError({ message }: { message: string | null }) {
   if (!message) return null;
-  return <p className="text-xs text-red-500 mt-1">{message}</p>;
+  return <p className="text-xs mt-1" style={{ color: 'var(--blocked)' }}>{message}</p>;
+}
+
+const inputStyle = {
+  background: 'var(--card-mid)',
+  border: '1px solid var(--border)',
+  color: 'var(--text)',
+};
+
+const inputClass = 'w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none';
+
+// ─── Step card wrapper ────────────────────────────────────────────────────────
+
+function StepCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl p-6 space-y-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+      {children}
+    </div>
+  );
+}
+
+// ─── Security mode button ─────────────────────────────────────────────────────
+
+function SecurityMode({
+  label, desc, isActive, onClick,
+}: {
+  label: string; desc: string; isActive: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="p-4 rounded-xl text-left transition-all"
+      style={{
+        background: isActive ? 'var(--card-mid)' : 'var(--bg)',
+        border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
+        boxShadow: isActive ? '0 0 0 1px var(--accent)' : 'none',
+      }}
+    >
+      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{label}</p>
+      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{desc}</p>
+    </button>
+  );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CreateVaultPage() {
   const router = useRouter();
-  const { registry, signer, isConnected, isRegistryConfigured } = useWeb3();
+  const { registry, signer, isConnected, isRegistryConfigured, connect, hasUPExtension } = useWeb3();
   const { t } = useI18n();
 
-  // Chain selection
-  const [chain, setChain]                         = useState<'lukso' | 'base'>('lukso');
+  const [chain, setChain]                               = useState<'lukso' | 'base'>('lukso');
   const baseTokenOptions = getBaseTokenOptions(BASE_CHAIN_ID);
-  const [baseToken, setBaseToken]                 = useState(baseTokenOptions[0].address);
-  const selectedToken = baseTokenOptions.find((t) => t.address === baseToken) ?? baseTokenOptions[0];
+  const [baseToken, setBaseToken]                       = useState(baseTokenOptions[0].address);
+  const selectedToken = baseTokenOptions.find((tok) => tok.address === baseToken) ?? baseTokenOptions[0];
 
-  // Deployed Base vault (separate from LUKSO deployed state)
-  const [deployedBase, setDeployedBase]           = useState<{ vault: string; policyEngine: string } | null>(null);
+  const [deployedBase, setDeployedBase]                 = useState<{ vault: string; policyEngine: string } | null>(null);
+  const [label, setLabel]                               = useState('');
+  const [budget, setBudget]                             = useState('0.5');
+  const [period, setPeriod]                             = useState('1');
+  const [hasExpiry, setHasExpiry]                       = useState(false);
+  const [expiryDate, setExpiryDate]                     = useState('');
+  const [agents, setAgents]                             = useState('');
+  const [usePerAgentBudgets, setUsePerAgentBudgets]     = useState(false);
+  const [agentBudgetMap, setAgentBudgetMap]             = useState<Record<string, string>>({});
+  const [merchants, setMerchants]                       = useState('');
+  const [status, setStatus]                             = useState('');
+  const [loading, setLoading]                           = useState(false);
+  const [deployed, setDeployed]                         = useState<{ safe: string; keyManager: string; policyEngine: string } | null>(null);
 
-  // Form state
-  const [label, setLabel]                         = useState('My Vault');
-  const [budget, setBudget]                       = useState('0.5');
-  const [period, setPeriod]                       = useState('1');
-  const [hasExpiry, setHasExpiry]                 = useState(false);
-  const [expiryDate, setExpiryDate]               = useState('');
-  const [agents, setAgents]                       = useState('');
-  const [usePerAgentBudgets, setUsePerAgentBudgets] = useState(false);
-  const [agentBudgetMap, setAgentBudgetMap]       = useState<Record<string, string>>({});
-  const [merchants, setMerchants]                 = useState('');
-  const [status, setStatus]                       = useState('');
-  const [loading, setLoading]                     = useState(false);
-  const [deployed, setDeployed]                   = useState<{ safe: string; keyManager: string; policyEngine: string } | null>(null);
-
-  // Wizard
-  const [step, setStep]                           = useState(1);
-  const [activeTemplate, setActiveTemplate]       = useState<string | null>(null);
-  const [stepTouched, setStepTouched]             = useState<Record<number, boolean>>({});
-  const [agentMode, setAgentMode]                 = useState<number>(AgentMode.STRICT_PAYMENTS);
+  const [step, setStep]                                 = useState(1);
+  const [activeTemplate, setActiveTemplate]             = useState<string | null>(null);
+  const [stepTouched, setStepTouched]                   = useState<Record<number, boolean>>({});
+  const [agentMode, setAgentMode]                       = useState<number>(AgentMode.STRICT_PAYMENTS);
   const [allowSuperPermissions, setAllowSuperPermissions] = useState(false);
   const [showPowerUserWarning, setShowPowerUserWarning] = useState(false);
+  const [pickerOpen, setPickerOpen]                     = useState<'agents' | 'merchants' | null>(null);
 
-  // Picker modal
-  const [pickerOpen, setPickerOpen]               = useState<'agents' | 'merchants' | null>(null);
+  const rawAgentList  = agents.split(',').map((a) => a.trim()).filter(Boolean);
+  const merchantCount = merchants.split(',').map((m) => m.trim()).filter(Boolean).length;
 
-  // Derived
-  const rawAgentList   = agents.split(',').map((a) => a.trim()).filter(Boolean);
-  const merchantCount  = merchants.split(',').map((m) => m.trim()).filter(Boolean).length;
   const securityLabel =
-    agentMode === AgentMode.STRICT_PAYMENTS ? 'Strict Payments' :
-    agentMode === AgentMode.SUBSCRIPTIONS ? 'Subscriptions' :
-    agentMode === AgentMode.TREASURY_BALANCED ? 'Treasury Balanced' :
-    agentMode === AgentMode.OPS_ADMIN ? 'Ops Admin' :
-    'Power User';
+    agentMode === AgentMode.STRICT_PAYMENTS   ? t('create.security.strict.label') :
+    agentMode === AgentMode.SUBSCRIPTIONS     ? t('create.security.subscriptions.label') :
+    agentMode === AgentMode.TREASURY_BALANCED ? t('create.security.treasury.label') :
+    agentMode === AgentMode.OPS_ADMIN         ? t('create.security.ops_admin.label') :
+    t('create.security.power_user.label');
   const securityRisk: 'low' | 'medium' | 'high' = agentMode === AgentMode.CUSTOM ? 'high' : 'low';
 
-  // Validation
-  const labelError  = stepTouched[1] && label.trim().length < 2  ? 'Vault name must be at least 2 characters.' : null;
-  const budgetError = stepTouched[1] && (!budget || parseFloat(budget) <= 0) ? 'Budget must be greater than 0.' : null;
-  const expiryError = stepTouched[2] && hasExpiry && !expiryDate  ? 'Please select an expiration date.'         : null;
+  const labelError  = stepTouched[1] && label.trim().length < 2    ? t('create.error.label_too_short') : null;
+  const budgetError = stepTouched[1] && (!budget || parseFloat(budget) <= 0) ? t('create.error.budget_zero') : null;
+  const expiryError = stepTouched[2] && hasExpiry && !expiryDate   ? t('create.error.expiry_required') : null;
 
   const step1Valid = label.trim().length >= 2 && !!budget && parseFloat(budget) > 0;
   const step2Valid = !hasExpiry || !!expiryDate;
 
-  const stepLabels = [t('create.step1.title'), t('create.step2.title'), 'Security', t('create.step3.title')];
+  const stepLabels = [t('create.step1.title'), t('create.step2.title'), t('create.step.security'), t('create.step3.title')];
 
   const applyTemplate = (cfg: TemplateConfig) => {
     setBudget(cfg.budget);
@@ -264,7 +328,6 @@ export default function CreateVaultPage() {
     setStep(1);
   };
 
-  /** Merge picker-selected addresses into an existing comma-separated string */
   const mergeAddresses = (existing: string, incoming: string[]) => {
     const current = existing.split(',').map((a) => a.trim()).filter(Boolean).map((a) => a.toLowerCase());
     const toAdd = incoming.filter((a) => !current.includes(a.toLowerCase()));
@@ -272,107 +335,44 @@ export default function CreateVaultPage() {
     return parts.join(', ');
   };
 
-  const handleAgentsPicked = (addresses: string[]) => {
-    setAgents((prev) => mergeAddresses(prev, addresses));
-    setAgentBudgetMap({});
-  };
+  const handleAgentsPicked    = (addresses: string[]) => { setAgents((prev) => mergeAddresses(prev, addresses)); setAgentBudgetMap({}); };
+  const handleMerchantsPicked = (addresses: string[]) => setMerchants((prev) => mergeAddresses(prev, addresses));
 
-  const handleMerchantsPicked = (addresses: string[]) => {
-    setMerchants((prev) => mergeAddresses(prev, addresses));
-  };
+  const handleStep1Next = () => { setStepTouched((p) => ({ ...p, 1: true })); if (step1Valid) setStep(2); };
+  const handleStep2Next = () => { setStepTouched((p) => ({ ...p, 2: true })); if (step2Valid) setStep(3); };
+  const handleStep3Next = () => setStep(4);
 
-  const handleStep1Next = () => {
-    setStepTouched((p) => ({ ...p, 1: true }));
-    if (step1Valid) setStep(2);
-  };
-
-  const handleStep2Next = () => {
-    setStepTouched((p) => ({ ...p, 2: true }));
-    if (step2Valid) setStep(3);
-  };
-
-  const handleStep3Next = () => {
-    setStep(4);
-  };
-
+  // ── Base deploy ──────────────────────────────────────────────────────────────
   const onSubmitBase = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isBaseFactoryConfigured()) {
-      setStatus('Error: NEXT_PUBLIC_BASE_VAULT_FACTORY_ADDRESS not configured.');
-      return;
-    }
-
+    if (!isBaseFactoryConfigured()) { setStatus('Error: NEXT_PUBLIC_BASE_VAULT_FACTORY_ADDRESS not configured.'); return; }
     setLoading(true);
     setStatus(t('create.base.switching'));
     try {
       await switchToBase();
-      const baseSigner = await getBaseSigner();
+      const baseSigner   = await getBaseSigner();
       const signerAddress = await baseSigner.getAddress();
-
       const agentList    = parseAddressList(agents, 'Agents');
       const merchantList = parseAddressList(merchants, 'Merchant whitelist');
-      const expirationUnix =
-        hasExpiry && expiryDate
-          ? BigInt(Math.floor(new Date(expiryDate).getTime() / 1000))
-          : BigInt(0);
-
-      if (hasExpiry && expiryDate && expirationUnix <= BigInt(Math.floor(Date.now() / 1000))) {
-        throw new Error('Expiration date must be in the future.');
-      }
-
-      const decimals = selectedToken.decimals;
-      const budgetWei = ethers.parseUnits(budget, decimals);
-
-      const agentBudgetsList =
-        usePerAgentBudgets && agentList.length > 0
-          ? agentList.map((addr) => {
-              const configured = agentBudgetMap[addr];
-              if (!configured) throw new Error(`Missing budget for agent ${addr}.`);
-              return ethers.parseUnits(configured, decimals);
-            })
-          : [];
-
-      setStatus('Sending transaction…');
+      const expirationUnix = hasExpiry && expiryDate ? BigInt(Math.floor(new Date(expiryDate).getTime() / 1000)) : BigInt(0);
+      if (hasExpiry && expiryDate && expirationUnix <= BigInt(Math.floor(Date.now() / 1000))) throw new Error('Expiration date must be in the future.');
+      const decimals     = selectedToken.decimals;
+      const budgetWei    = ethers.parseUnits(budget, decimals);
+      const agentBudgetsList = usePerAgentBudgets && agentList.length > 0
+        ? agentList.map((addr) => { const configured = agentBudgetMap[addr]; if (!configured) throw new Error(`Missing budget for agent ${addr}.`); return ethers.parseUnits(configured, decimals); })
+        : [];
+      setStatus(t('create.status.sending'));
       const factory = getBaseVaultFactoryContract(baseSigner);
-      const tx = await factory.deployVault({
-        label,
-        token: baseToken,
-        budget: budgetWei,
-        period: Number(period),
-        tokenBudgets: [],
-        expiration: expirationUnix,
-        agents: agentList,
-        agentBudgets: agentBudgetsList,
-        merchants: merchantList,
-      });
-
-      setStatus('Waiting for confirmation…');
+      const tx = await factory.deployVault({ label, token: baseToken, budget: budgetWei, period: Number(period), tokenBudgets: [], expiration: expirationUnix, agents: agentList, agentBudgets: agentBudgetsList, merchants: merchantList });
+      setStatus(t('create.status.confirming'));
       const receipt = await tx.wait();
       if (!receipt) throw new Error('Transaction receipt not available');
-
       const iface = factory.interface;
       let vaultAddr = '', peAddr = '';
-      for (const log of receipt.logs) {
-        try {
-          const parsed = iface.parseLog(log);
-          if (parsed?.name === 'VaultDeployed') {
-            vaultAddr = parsed.args.vault;
-            peAddr    = parsed.args.policyEngine;
-          }
-        } catch { /* ignore unrelated logs */ }
-      }
-
-      if (!vaultAddr) {
-        const latest = await factory.getVaults(signerAddress);
-        if (latest.length > 0) {
-          const found = latest[latest.length - 1];
-          vaultAddr = found.vault;
-          peAddr    = found.policyEngine;
-        }
-      }
-
+      for (const log of receipt.logs) { try { const parsed = iface.parseLog(log); if (parsed?.name === 'VaultDeployed') { vaultAddr = parsed.args.vault; peAddr = parsed.args.policyEngine; } } catch { /* ignore */ } }
+      if (!vaultAddr) { const latest = await factory.getVaults(signerAddress); if (latest.length > 0) { const found = latest[latest.length - 1]; vaultAddr = found.vault; peAddr = found.policyEngine; } }
       setDeployedBase({ vault: vaultAddr, policyEngine: peAddr });
-      setStatus('Vault deployed!');
+      setStatus(t('create.status.deployed'));
     } catch (err: unknown) {
       setStatus('Error: ' + getErrorMessage(err));
     } finally {
@@ -380,108 +380,53 @@ export default function CreateVaultPage() {
     }
   };
 
+  // ── LUKSO deploy ─────────────────────────────────────────────────────────────
   const onSubmit = async (e: React.FormEvent) => {
     if (chain === 'base') return onSubmitBase(e);
     e.preventDefault();
-    if (!isRegistryConfigured) {
-      setStatus('Error: Registry address not configured. Set NEXT_PUBLIC_REGISTRY_ADDRESS in .env.local.');
-      return;
-    }
-    if (!registry || !signer) {
-      setStatus('Error: Connect your wallet first.');
-      return;
-    }
-
+    if (!isRegistryConfigured) { setStatus('Error: Registry address not configured. Set NEXT_PUBLIC_REGISTRY_ADDRESS in .env.local.'); return; }
+    if (!registry || !signer) { setStatus('Error: Connect your wallet first.'); return; }
     setLoading(true);
     setStatus('');
     try {
       const owner = await signer.getAddress();
       const existingVaults = await registry.getVaults(owner);
       const existingSafeAddresses = new Set(existingVaults.map((v) => v.safe.toLowerCase()));
-
-      const agentList   = parseAddressList(agents, 'Agents');
+      const agentList    = parseAddressList(agents, 'Agents');
       const merchantList = parseAddressList(merchants, 'Merchant whitelist');
-      const expirationUnix =
-        hasExpiry && expiryDate
-          ? BigInt(Math.floor(new Date(expiryDate).getTime() / 1000))
-          : BigInt(0);
-
-      if (hasExpiry && expiryDate && expirationUnix <= BigInt(Math.floor(Date.now() / 1000))) {
-        throw new Error('Expiration date must be in the future.');
-      }
-
-      const agentBudgetsList =
-        usePerAgentBudgets && agentList.length > 0
-          ? agentList.map((addr) => {
-              const configured = agentBudgetMap[addr];
-              if (!configured) throw new Error(`Missing budget for agent ${addr}.`);
-              return ethers.parseEther(configured);
-            })
-          : [];
-
-      const modeNeedsAllowedCalls =
-        agentMode === AgentMode.STRICT_PAYMENTS ||
-        agentMode === AgentMode.SUBSCRIPTIONS ||
-        agentMode === AgentMode.TREASURY_BALANCED;
+      const expirationUnix = hasExpiry && expiryDate ? BigInt(Math.floor(new Date(expiryDate).getTime() / 1000)) : BigInt(0);
+      if (hasExpiry && expiryDate && expirationUnix <= BigInt(Math.floor(Date.now() / 1000))) throw new Error('Expiration date must be in the future.');
+      const agentBudgetsList = usePerAgentBudgets && agentList.length > 0
+        ? agentList.map((addr) => { const configured = agentBudgetMap[addr]; if (!configured) throw new Error(`Missing budget for agent ${addr}.`); return ethers.parseEther(configured); })
+        : [];
+      const modeNeedsAllowedCalls = agentMode === AgentMode.STRICT_PAYMENTS || agentMode === AgentMode.SUBSCRIPTIONS || agentMode === AgentMode.TREASURY_BALANCED;
       const shouldWriteAllowedCalls = modeNeedsAllowedCalls && !allowSuperPermissions;
       const encodedAllowedCalls = encodeAllowedCallsForTargets(merchantList);
-      const allowedCallsByAgent = shouldWriteAllowedCalls
-        ? agentList.map((address) => ({ agent: address, allowedCalls: encodedAllowedCalls }))
-        : [];
-      const customAgentPermissions =
-        agentMode === AgentMode.CUSTOM ? PERM_POWER_USER : ethers.ZeroHash;
-
-      setStatus('Sending transaction…');
-      setStatus('Waiting for confirmation…');
-      const { receipt, deployed: deployedVault } = await deployRegistryVault({
-        registry,
-        owner,
-        existingSafeAddresses,
-        params: buildRegistryDeployParams({
-          budget: ethers.parseEther(budget),
-          period: Number(period),
-          expiration: expirationUnix,
-          agents: agentList,
-          agentBudgets: agentBudgetsList,
-          merchants: merchantList,
-          label,
-          agentMode,
-          allowSuperPermissions,
-          customAgentPermissions,
-          allowedCallsByAgent,
-        }),
-      });
+      const allowedCallsByAgent = shouldWriteAllowedCalls ? agentList.map((address) => ({ agent: address, allowedCalls: encodedAllowedCalls })) : [];
+      const customAgentPermissions = agentMode === AgentMode.CUSTOM ? PERM_POWER_USER : ethers.ZeroHash;
+      setStatus(t('create.status.sending'));
+      setStatus(t('create.status.confirming'));
+      const { receipt, deployed: deployedVault } = await deployRegistryVault({ registry, owner, existingSafeAddresses, params: buildRegistryDeployParams({ budget: ethers.parseEther(budget), period: Number(period), expiration: expirationUnix, agents: agentList, agentBudgets: agentBudgetsList, merchants: merchantList, label, agentMode, allowSuperPermissions, customAgentPermissions, allowedCallsByAgent }) });
       const safeAddr = deployedVault?.safe ?? '';
-      const kmAddr = deployedVault?.keyManager ?? '';
-      const peAddr = deployedVault?.policyEngine ?? '';
-
+      const kmAddr   = deployedVault?.keyManager ?? '';
+      const peAddr   = deployedVault?.policyEngine ?? '';
       if (!safeAddr) {
         setStatus(`Vault deployed (tx: ${receipt.hash}), but deployed addresses could not be recovered. Check the explorer or refresh your vault list.`);
       } else {
         try {
           const ethereumProvider = (window as unknown as { ethereum?: Eip1193ProviderLike }).ethereum;
-          if (!ethereumProvider) {
-            throw new Error('Wallet provider is unavailable for post-deploy verification.');
-          }
+          if (!ethereumProvider) throw new Error('Wallet provider is unavailable for post-deploy verification.');
           const client = createPublicClient({ transport: custom(ethereumProvider) });
           const expectedPermissions = permissionHexForMode(agentMode);
-          const verifyRows = await verifyPermissionsWrite(client, safeAddr as `0x${string}`, agentList.map((address) => ({
-            address,
-            mode: agentMode,
-            expectedPermissions,
-            expectedAllowedCalls: shouldWriteAllowedCalls ? encodedAllowedCalls : '0x',
-          })));
+          const verifyRows = await verifyPermissionsWrite(client, safeAddr as `0x${string}`, agentList.map((address) => ({ address, mode: agentMode, expectedPermissions, expectedAllowedCalls: shouldWriteAllowedCalls ? encodedAllowedCalls : '0x' })));
           const failed = verifyRows.filter((r) => !r.permissionsMatch || !r.allowedCallsMatch);
-          if (failed.length > 0) {
-            throw new Error('On-chain permission verification failed after deployment.');
-          }
+          if (failed.length > 0) throw new Error('On-chain permission verification failed after deployment.');
         } catch (verifyErr: unknown) {
           setStatus('Error: ' + getErrorMessage(verifyErr));
           return;
         }
-
         setDeployed({ safe: safeAddr, keyManager: kmAddr, policyEngine: peAddr });
-        setStatus('Vault deployed!');
+        setStatus(t('create.status.deployed'));
       }
     } catch (err: unknown) {
       setStatus('Error: ' + getErrorMessage(err));
@@ -490,50 +435,41 @@ export default function CreateVaultPage() {
     }
   };
 
-  // ── Base success screen ───────────────────────────────────────────────────────
+  // ── Success: Base ─────────────────────────────────────────────────────────────
   if (deployedBase) {
     return (
-      <div className="space-y-lg max-w-2xl">
+      <div className="space-y-6 max-w-2xl">
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50">{t('create.success.base.title')}</h1>
-          <p className="text-neutral-600 dark:text-neutral-400 mt-xs">{t('create.success.base.subtitle')}</p>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{t('create.success.base.title')}</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>{t('create.success.base.subtitle')}</p>
         </div>
         <Alert variant="success">
-          <AlertTitle>🔵 Base Network</AlertTitle>
+          <AlertTitle>🔵 {t('create.success.base_network')}</AlertTitle>
           <AlertDescription>{t('create.success.base.note')}</AlertDescription>
         </Alert>
-        <Card>
-          <CardContent>
-            <div className="space-y-md text-sm font-mono">
-              {[
-                { label: 'Vault', value: deployedBase.vault },
-                { label: 'PolicyEngine', value: deployedBase.policyEngine },
-              ].map(({ label: lbl, value }) => (
-                <div key={lbl}>
-                  <p className="text-neutral-500 dark:text-neutral-400 font-sans text-xs uppercase tracking-wide mb-xs">{lbl}</p>
-                  <p className="text-neutral-900 dark:text-neutral-100 break-all">{value || '—'}</p>
-                </div>
-              ))}
+        <div className="rounded-2xl p-5 space-y-4" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+          {[{ label: t('create.success.contract.vault'), value: deployedBase.vault }, { label: t('create.success.contract.policy_engine'), value: deployedBase.policyEngine }].map(({ label: lbl, value }) => (
+            <div key={lbl}>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--text-muted)' }}>{lbl}</p>
+              <p className="text-sm font-mono break-all" style={{ color: 'var(--text)' }}>{value || '—'}</p>
             </div>
-          </CardContent>
-        </Card>
-        <div className="flex gap-md">
+          ))}
+        </div>
+        <div className="flex gap-3">
           <Button variant="primary" onClick={() => router.push('/vaults')}>{t('create.success.view_vaults')}</Button>
-          <Button variant="secondary" onClick={() => { setDeployedBase(null); setStatus(''); setStep(1); }}>
-            {t('create.success.create_another')}
-          </Button>
+          <Button variant="secondary" onClick={() => { setDeployedBase(null); setStatus(''); setStep(1); }}>{t('create.success.create_another')}</Button>
         </div>
       </div>
     );
   }
 
-  // ── LUKSO success screen ───────────────────────────────────────────────────────
+  // ── Success: LUKSO ────────────────────────────────────────────────────────────
   if (deployed) {
     return (
-      <div className="space-y-lg max-w-2xl">
+      <div className="space-y-6 max-w-2xl">
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50">{t('create.success.title')}</h1>
-          <p className="text-neutral-600 dark:text-neutral-400 mt-xs">{t('create.success.subtitle')}</p>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{t('create.success.title')}</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>{t('create.success.subtitle')}</p>
         </div>
         <Alert variant="success">
           <AlertTitle>{t('create.success.ownership.title')}</AlertTitle>
@@ -541,34 +477,27 @@ export default function CreateVaultPage() {
             {t('create.success.ownership.desc').split('acceptOwnership()').map((part, i) =>
               i === 0 ? part : (
                 <span key={i}>
-                  <code className="font-mono text-xs bg-neutral-100 dark:bg-neutral-700 px-1 rounded">acceptOwnership()</code>
+                  <code
+                    className="font-mono text-xs px-1 rounded"
+                    style={{ background: 'var(--card-mid)', color: 'var(--accent)' }}
+                  >acceptOwnership()</code>
                   {part}
                 </span>
               )
             )}
           </AlertDescription>
         </Alert>
-        <Card>
-          <CardContent>
-            <div className="space-y-md text-sm font-mono">
-              {[
-                { label: 'Safe', value: deployed.safe },
-                { label: 'KeyManager', value: deployed.keyManager },
-                { label: 'PolicyEngine', value: deployed.policyEngine },
-              ].map(({ label: lbl, value }) => (
-                <div key={lbl}>
-                  <p className="text-neutral-500 dark:text-neutral-400 font-sans text-xs uppercase tracking-wide mb-xs">{lbl}</p>
-                  <p className="text-neutral-900 dark:text-neutral-100 break-all">{value || '—'}</p>
-                </div>
-              ))}
+        <div className="rounded-2xl p-5 space-y-4" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+          {[{ label: t('create.success.contract.safe'), value: deployed.safe }, { label: t('create.success.contract.key_manager'), value: deployed.keyManager }, { label: t('create.success.contract.policy_engine'), value: deployed.policyEngine }].map(({ label: lbl, value }) => (
+            <div key={lbl}>
+              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--text-muted)' }}>{lbl}</p>
+              <p className="text-sm font-mono break-all" style={{ color: 'var(--text)' }}>{value || '—'}</p>
             </div>
-          </CardContent>
-        </Card>
-        <div className="flex gap-md">
+          ))}
+        </div>
+        <div className="flex gap-3">
           <Button variant="primary" onClick={() => router.push('/vaults')}>{t('create.success.view_vaults')}</Button>
-          <Button variant="secondary" onClick={() => { setDeployed(null); setStatus(''); setStep(1); }}>
-            {t('create.success.create_another')}
-          </Button>
+          <Button variant="secondary" onClick={() => { setDeployed(null); setStatus(''); setStep(1); }}>{t('create.success.create_another')}</Button>
         </div>
       </div>
     );
@@ -576,11 +505,23 @@ export default function CreateVaultPage() {
 
   // ── Wizard ────────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-lg max-w-5xl">
+    <div className="space-y-6 max-w-5xl">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50">{t('create.title')}</h1>
-        <p className="text-neutral-600 dark:text-neutral-400 mt-xs">{t('create.subtitle')}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--accent)' }}>
+            {t('create.expert_mode_label')}
+          </p>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{t('create.title')}</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>{t('create.subtitle')}</p>
+        </div>
+        <Link
+          href="/setup"
+          className="flex-shrink-0 text-xs font-medium mt-1 transition-opacity hover:opacity-80"
+          style={{ color: 'var(--accent)' }}
+        >
+          {t('create.back_to_simple')}
+        </Link>
       </div>
 
       {/* System alerts */}
@@ -597,57 +538,66 @@ export default function CreateVaultPage() {
         </Alert>
       )}
 
-      {/* Chain selector — full width, step 1 only */}
+      {/* Chain selector — step 1 only */}
       {step === 1 && (
-        <div>
-          <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-sm">{t('create.chain.label')}</p>
-          <div className="flex gap-sm">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+            {t('create.chain.label')}
+          </p>
+          <div className="flex gap-3">
             {(['lukso', 'base'] as const).map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => setChain(c)}
-                className={cn(
-                  'flex items-center gap-sm px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all',
-                  chain === c
-                    ? c === 'lukso'
-                      ? 'border-pink-500 bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300'
-                      : 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
-                    : 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:border-neutral-400'
-                )}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all"
+                style={{
+                  background: chain === c ? 'var(--card-mid)' : 'var(--bg)',
+                  border: `1px solid ${chain === c ? 'var(--accent)' : 'var(--border)'}`,
+                  color: chain === c ? 'var(--text)' : 'var(--text-muted)',
+                  boxShadow: chain === c ? '0 0 0 1px var(--accent)' : 'none',
+                }}
               >
-                <span className="text-xl">{c === 'lukso' ? '🌐' : '🔵'}</span>
+                <span>{c === 'lukso' ? '🌐' : '🔵'}</span>
                 {t(c === 'lukso' ? 'create.chain.lukso' : 'create.chain.base')}
               </button>
             ))}
           </div>
-          <p className="text-xs text-neutral-400 mt-xs">{t('create.chain.hint')}</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('create.chain.hint')}</p>
         </div>
       )}
 
-      {/* Template picker — full width, step 1 only */}
+      {/* Template picker — step 1 only */}
       {step === 1 && (
-        <div>
-          <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-sm">{t('create.template_prompt')}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-sm">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+            {t('create.template_prompt')}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {TEMPLATE_CONFIGS.map((cfg) => {
-              const style = TEMPLATE_STYLE[cfg.id];
               const isActive = activeTemplate === cfg.id;
               return (
                 <button
                   key={cfg.id}
                   type="button"
                   onClick={() => applyTemplate(cfg)}
-                  className={cn(
-                    'text-left p-4 rounded-xl border-2 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500',
-                    isActive ? style.active : cn(style.base, style.hover)
-                  )}
+                  className="text-left p-4 rounded-xl transition-all"
+                  style={{
+                    background: isActive ? 'var(--card-mid)' : 'var(--card)',
+                    border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
+                    boxShadow: isActive ? '0 0 0 1px var(--accent)' : 'none',
+                  }}
                 >
-                  <span className="text-2xl block mb-2">{style.emoji}</span>
-                  <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-50 leading-tight">
+                  <span
+                    className="block text-xl mb-2 font-mono"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    {TEMPLATE_ICON[cfg.id]}
+                  </span>
+                  <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text)' }}>
                     {t(`create.template.${cfg.id}.name` as Parameters<typeof t>[0])}
                   </p>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
+                  <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                     {t(`create.template.${cfg.id}.desc` as Parameters<typeof t>[0])}
                   </p>
                 </button>
@@ -657,360 +607,375 @@ export default function CreateVaultPage() {
         </div>
       )}
 
-      {/* Step indicator + two-column layout */}
-      <div className="lg:grid lg:grid-cols-3 lg:gap-lg space-y-lg lg:space-y-0">
+      {/* Two-column layout */}
+      <div className="lg:grid lg:grid-cols-3 lg:gap-6 space-y-6 lg:space-y-0">
         {/* Left: form (2 cols) */}
-        <div className="lg:col-span-2 space-y-md">
+        <div className="lg:col-span-2 space-y-5">
           <StepIndicator current={step} steps={stepLabels} />
 
           {/* ── Step 1: Basics ─────────────────────────────────────────────── */}
           {step === 1 && (
-            <Card>
-              <CardHeader><CardTitle>{t('create.step1.title')}</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-md">
-                  <div>
-                    <label className="label">{t('create.field.label')}</label>
-                    <input
-                      className={cn('input', labelError && 'border-red-400 focus:ring-red-400')}
-                      value={label}
-                      onChange={(e) => setLabel(e.target.value)}
-                      placeholder="e.g., Groceries Vault"
-                    />
-                    <FieldError message={labelError} />
-                  </div>
+            <StepCard>
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text)' }}>{t('create.step1.title')}</h3>
+              <div>
+                <FieldLabel>{t('create.field.label')}</FieldLabel>
+                <input
+                  className={inputClass}
+                  style={{ ...inputStyle, borderColor: labelError ? 'var(--blocked)' : 'var(--border)' }}
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder={t('create.field.label_placeholder')}
+                />
+                <FieldError message={labelError} />
+              </div>
 
-                  {chain === 'base' && (
-                    <div>
-                      <label className="label">{t('create.field.token')}</label>
-                      <div className="flex gap-xs flex-wrap">
-                        {baseTokenOptions.map((tok) => (
-                          <button
-                            key={tok.address}
-                            type="button"
-                            onClick={() => setBaseToken(tok.address)}
-                            className={cn(
-                              'px-3 py-1.5 rounded-lg border text-sm font-medium transition-all',
-                              baseToken === tok.address
-                                ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
-                                : 'border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-400'
-                            )}
-                          >
-                            {tok.emoji} {tok.symbol}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-md">
-                    <div>
-                      <label className="label">
-                        {chain === 'base'
-                          ? `${t('create.field.budget_token')} (${selectedToken.symbol})`
-                          : t('create.field.budget')}
-                      </label>
-                      <input
-                        className={cn('input', budgetError && 'border-red-400 focus:ring-red-400')}
-                        type="number"
-                        step="0.0001"
-                        min="0"
-                        value={budget}
-                        onChange={(e) => setBudget(e.target.value)}
-                      />
-                      <FieldError message={budgetError} />
-                    </div>
-                    <div>
-                      <label className="label">{t('create.field.period')}</label>
-                      <select className="input" value={period} onChange={(e) => setPeriod(e.target.value)}>
-                        <option value="0">{t('create.field.period.daily')}</option>
-                        <option value="1">{t('create.field.period.weekly')}</option>
-                        <option value="2">{t('create.field.period.monthly')}</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-sm">
-                    <Button type="button" variant="primary" onClick={handleStep1Next}>
-                      {t('create.btn.next_rules')}
-                    </Button>
+              {chain === 'base' && (
+                <div>
+                  <FieldLabel>{t('create.field.token')}</FieldLabel>
+                  <div className="flex gap-2 flex-wrap">
+                    {baseTokenOptions.map((tok) => (
+                      <button
+                        key={tok.address}
+                        type="button"
+                        onClick={() => setBaseToken(tok.address)}
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                        style={{
+                          background: baseToken === tok.address ? 'var(--card-mid)' : 'var(--bg)',
+                          border: `1px solid ${baseToken === tok.address ? 'var(--accent)' : 'var(--border)'}`,
+                          color: baseToken === tok.address ? 'var(--text)' : 'var(--text-muted)',
+                        }}
+                      >
+                        {tok.emoji} {tok.symbol}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <FieldLabel>
+                    {chain === 'base'
+                      ? `${t('create.field.budget_token')} (${selectedToken.symbol})`
+                      : t('create.field.budget')}
+                  </FieldLabel>
+                  <input
+                    className={inputClass}
+                    style={{ ...inputStyle, borderColor: budgetError ? 'var(--blocked)' : 'var(--border)' }}
+                    type="number" step="0.0001" min="0"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                  />
+                  <FieldError message={budgetError} />
+                </div>
+                <div>
+                  <FieldLabel>{t('create.field.period')}</FieldLabel>
+                  <select
+                    className={inputClass}
+                    style={inputStyle}
+                    value={period}
+                    onChange={(e) => setPeriod(e.target.value)}
+                  >
+                    <option value="0">{t('create.field.period.daily')}</option>
+                    <option value="1">{t('create.field.period.weekly')}</option>
+                    <option value="2">{t('create.field.period.monthly')}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <Button type="button" variant="primary" onClick={handleStep1Next}>
+                  {t('create.btn.next_rules')}
+                </Button>
+              </div>
+            </StepCard>
           )}
 
           {/* ── Step 2: Protection rules ────────────────────────────────────── */}
           {step === 2 && (
-            <Card>
-              <CardHeader><CardTitle>{t('create.step2.title')}</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-md">
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('create.step2.subtitle')}</p>
+            <StepCard>
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text)' }}>{t('create.step2.title')}</h3>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('create.step2.subtitle')}</p>
 
-                  <div className="space-y-sm">
-                    <label className="flex items-center gap-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={hasExpiry}
-                        onChange={(e) => { setHasExpiry(e.target.checked); if (!e.target.checked) setExpiryDate(''); }}
-                        className="rounded"
-                      />
-                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        {t('create.field.expiry_toggle')}
-                      </span>
-                    </label>
-                    {hasExpiry && (
-                      <div>
-                        <label className="label">{t('create.field.expiry_date')}</label>
-                        <input
-                          className={cn('input', expiryError && 'border-red-400 focus:ring-red-400')}
-                          type="datetime-local"
-                          value={expiryDate}
-                          onChange={(e) => setExpiryDate(e.target.value)}
-                          min={new Date().toISOString().slice(0, 16)}
-                        />
-                        <FieldError message={expiryError} />
-                      </div>
-                    )}
-                  </div>
-
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasExpiry}
+                    onChange={(e) => { setHasExpiry(e.target.checked); if (!e.target.checked) setExpiryDate(''); }}
+                    className="rounded"
+                  />
+                  <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                    {t('create.field.expiry_toggle')}
+                  </span>
+                </label>
+                {hasExpiry && (
                   <div>
-                    <div className="flex items-center justify-between mb-xs">
-                      <label className="label !mb-0">{t('create.field.merchants')}</label>
-                      <button
-                        type="button"
-                        onClick={() => setPickerOpen('merchants')}
-                        className="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 flex items-center gap-1"
-                      >
-                        <span>👥</span> {t('picker.browse')}
-                      </button>
-                    </div>
+                    <FieldLabel>{t('create.field.expiry_date')}</FieldLabel>
                     <input
-                      className="input"
-                      value={merchants}
-                      onChange={(e) => setMerchants(e.target.value)}
-                      placeholder="0xabcd…, 0xef01… (comma-separated)"
+                      className={inputClass}
+                      style={{ ...inputStyle, borderColor: expiryError ? 'var(--blocked)' : 'var(--border)' }}
+                      type="datetime-local"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                      min={new Date().toISOString().slice(0, 16)}
                     />
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-xs">{t('create.field.merchants_hint')}</p>
+                    <FieldError message={expiryError} />
                   </div>
+                )}
+              </div>
 
-                  <div className="flex justify-between pt-sm">
-                    <Button type="button" variant="secondary" onClick={() => setStep(1)}>Back</Button>
-                    <div className="flex gap-sm">
-                      <Button type="button" variant="secondary" onClick={() => { setHasExpiry(false); setExpiryDate(''); setMerchants(''); setStep(3); }}>
-                        Skip
-                      </Button>
-                      <Button type="button" variant="primary" onClick={handleStep2Next}>
-                        Next: Security
-                      </Button>
-                    </div>
-                  </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <FieldLabel>{t('create.field.merchants')}</FieldLabel>
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen('merchants')}
+                    className="text-xs font-medium flex items-center gap-1"
+                    style={{ color: 'var(--accent)' }}
+                  >
+                    <span>◉</span> {t('picker.browse')}
+                  </button>
                 </div>
-              </CardContent>
-            </Card>
+                <input
+                  className={inputClass}
+                  style={inputStyle}
+                  value={merchants}
+                  onChange={(e) => setMerchants(e.target.value)}
+                  placeholder={t('create.field.merchants_placeholder')}
+                />
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{t('create.field.merchants_hint')}</p>
+              </div>
+
+              <div className="flex justify-between pt-2">
+                <Button type="button" variant="secondary" onClick={() => setStep(1)}>{t('create.btn.back')}</Button>
+                <div className="flex gap-2">
+                  <Button type="button" variant="secondary" onClick={() => { setHasExpiry(false); setExpiryDate(''); setMerchants(''); setStep(3); }}>
+                    {t('create.btn.skip_protection')}
+                  </Button>
+                  <Button type="button" variant="primary" onClick={handleStep2Next}>
+                    {t('create.btn.next_security')}
+                  </Button>
+                </div>
+              </div>
+            </StepCard>
           )}
 
           {/* ── Step 3: Security profile ─────────────────────────────────────── */}
           {step === 3 && (
-            <Card>
-              <CardHeader><CardTitle>Security Profile</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-md">
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                    Choose how much authority each agent gets. Default profile is strict and does not use SUPER permissions.
-                  </p>
+            <StepCard>
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text)' }}>{t('create.security.title')}</h3>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                {t('create.security.subtitle')}
+              </p>
 
-                  <div className="grid sm:grid-cols-2 gap-sm">
-                    <button
-                      type="button"
-                      onClick={() => { setAgentMode(AgentMode.STRICT_PAYMENTS); setAllowSuperPermissions(false); }}
-                      className={cn('p-4 rounded-xl border-2 text-left', agentMode === AgentMode.STRICT_PAYMENTS ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'border-neutral-200 dark:border-neutral-700')}
-                    >
-                      <p className="font-semibold text-sm">Strict Payments</p>
-                      <p className="text-xs text-neutral-500">CALL + TRANSFERVALUE with AllowedCalls enforcement.</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setAgentMode(AgentMode.SUBSCRIPTIONS); setAllowSuperPermissions(false); }}
-                      className={cn('p-4 rounded-xl border-2 text-left', agentMode === AgentMode.SUBSCRIPTIONS ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-neutral-200 dark:border-neutral-700')}
-                    >
-                      <p className="font-semibold text-sm">Subscriptions</p>
-                      <p className="text-xs text-neutral-500">Strict Payments + relay execution.</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setAgentMode(AgentMode.TREASURY_BALANCED); setAllowSuperPermissions(false); }}
-                      className={cn('p-4 rounded-xl border-2 text-left', agentMode === AgentMode.TREASURY_BALANCED ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20' : 'border-neutral-200 dark:border-neutral-700')}
-                    >
-                      <p className="font-semibold text-sm">Treasury Balanced</p>
-                      <p className="text-xs text-neutral-500">Strict Payments + STATICCALL for read-heavy workflows.</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setAgentMode(AgentMode.OPS_ADMIN); setAllowSuperPermissions(false); }}
-                      className={cn('p-4 rounded-xl border-2 text-left', agentMode === AgentMode.OPS_ADMIN ? 'border-slate-500 bg-slate-50 dark:bg-slate-900/20' : 'border-neutral-200 dark:border-neutral-700')}
-                    >
-                      <p className="font-semibold text-sm">Ops Admin</p>
-                      <p className="text-xs text-neutral-500">SETDATA only, no value transfer.</p>
-                    </button>
-                  </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <SecurityMode
+                  label={t('create.security.strict.label')}
+                  desc={t('create.security.strict.desc')}
+                  isActive={agentMode === AgentMode.STRICT_PAYMENTS}
+                  onClick={() => { setAgentMode(AgentMode.STRICT_PAYMENTS); setAllowSuperPermissions(false); }}
+                />
+                <SecurityMode
+                  label={t('create.security.subscriptions.label')}
+                  desc={t('create.security.subscriptions.desc')}
+                  isActive={agentMode === AgentMode.SUBSCRIPTIONS}
+                  onClick={() => { setAgentMode(AgentMode.SUBSCRIPTIONS); setAllowSuperPermissions(false); }}
+                />
+                <SecurityMode
+                  label={t('create.security.treasury.label')}
+                  desc={t('create.security.treasury.desc')}
+                  isActive={agentMode === AgentMode.TREASURY_BALANCED}
+                  onClick={() => { setAgentMode(AgentMode.TREASURY_BALANCED); setAllowSuperPermissions(false); }}
+                />
+                <SecurityMode
+                  label={t('create.security.ops_admin.label')}
+                  desc={t('create.security.ops_admin.desc')}
+                  isActive={agentMode === AgentMode.OPS_ADMIN}
+                  onClick={() => { setAgentMode(AgentMode.OPS_ADMIN); setAllowSuperPermissions(false); }}
+                />
+              </div>
 
-                  <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-900 p-3">
-                    <label className="flex items-center justify-between gap-sm">
-                      <span className="text-sm font-medium text-red-700 dark:text-red-300">Enable Power User (SUPER permissions)</span>
-                      <input
-                        type="checkbox"
-                        checked={agentMode === AgentMode.CUSTOM && allowSuperPermissions}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setShowPowerUserWarning(true);
-                          } else {
-                            setAllowSuperPermissions(false);
-                            setAgentMode(AgentMode.STRICT_PAYMENTS);
-                          }
-                        }}
-                      />
-                    </label>
-                    <p className="text-xs text-red-600 dark:text-red-300 mt-1">
-                      SUPER_CALL bypasses AllowedCalls. Use only for advanced enterprise scenarios.
-                    </p>
-                  </div>
+              {/* Power User toggle */}
+              <div
+                className="rounded-xl px-4 py-3"
+                style={{ background: 'rgba(255,77,109,0.08)', border: '1px solid rgba(255,77,109,0.25)' }}
+              >
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <span className="text-sm font-medium" style={{ color: 'var(--blocked)' }}>
+                    {t('create.security.power_user.label')}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={agentMode === AgentMode.CUSTOM && allowSuperPermissions}
+                    onChange={(e) => {
+                      if (e.target.checked) { setShowPowerUserWarning(true); }
+                      else { setAllowSuperPermissions(false); setAgentMode(AgentMode.STRICT_PAYMENTS); }
+                    }}
+                  />
+                </label>
+                <p className="text-xs mt-1" style={{ color: 'var(--blocked)', opacity: 0.8 }}>
+                  {t('create.security.power_user.desc')}
+                </p>
+              </div>
 
-                  {showPowerUserWarning && (
-                    <Alert variant="warning">
-                      <AlertTitle>High-Risk Permission</AlertTitle>
-                      <AlertDescription>
-                        Power User mode enables SUPER permissions and bypasses AllowedCalls restrictions.
-                        <div className="mt-2 flex gap-2">
-                          <Button type="button" variant="secondary" onClick={() => setShowPowerUserWarning(false)}>Cancel</Button>
-                          <Button
-                            type="button"
-                            variant="primary"
-                            onClick={() => {
-                              setAgentMode(AgentMode.CUSTOM);
-                              setAllowSuperPermissions(true);
-                              setShowPowerUserWarning(false);
-                            }}
-                          >
-                            I Understand, Enable
-                          </Button>
-                        </div>
-                      </AlertDescription>
-                    </Alert>
-                  )}
+              {showPowerUserWarning && (
+                <Alert variant="warning">
+                  <AlertTitle>{t('create.security.power_user.warning.title')}</AlertTitle>
+                  <AlertDescription>
+                    {t('create.security.power_user.warning.body')}
+                    <div className="mt-2 flex gap-2">
+                      <Button type="button" variant="secondary" onClick={() => setShowPowerUserWarning(false)}>
+                        {t('create.security.power_user.warning.cancel')}
+                      </Button>
+                      <Button type="button" variant="primary" onClick={() => { setAgentMode(AgentMode.CUSTOM); setAllowSuperPermissions(true); setShowPowerUserWarning(false); }}>
+                        {t('create.security.power_user.warning.confirm')}
+                      </Button>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
 
-                  <div className="flex justify-between pt-sm">
-                    <Button type="button" variant="secondary" onClick={() => setStep(2)}>Back</Button>
-                    <Button type="button" variant="primary" onClick={handleStep3Next}>
-                      Next: Agents
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              <div className="flex justify-between pt-2">
+                <Button type="button" variant="secondary" onClick={() => setStep(2)}>{t('create.btn.back')}</Button>
+                <Button type="button" variant="primary" onClick={handleStep3Next}>{t('create.btn.next_agents')}</Button>
+              </div>
+            </StepCard>
           )}
 
           {/* ── Step 4: Agents ──────────────────────────────────────────────── */}
           {step === 4 && (
             <form onSubmit={onSubmit}>
-              <Card>
-                <CardHeader><CardTitle>{t('create.step3.title')}</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="space-y-md">
-                    <Alert variant="info">
-                      <AlertDescription>
-                        {t('create.agents_info')}{' '}
-                        <Link href="/agents" className="underline font-medium">{t('create.agents_browse')}</Link>
-                      </AlertDescription>
-                    </Alert>
+              <StepCard>
+                <h3 className="text-base font-semibold" style={{ color: 'var(--text)' }}>{t('create.step3.title')}</h3>
 
-                    <div>
-                      <div className="flex items-center justify-between mb-xs">
-                        <label className="label !mb-0">{t('create.field.agents')}</label>
-                        <button
-                          type="button"
-                          onClick={() => setPickerOpen('agents')}
-                          className="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 flex items-center gap-1"
-                        >
-                          <span>👥</span> {t('picker.browse')}
-                        </button>
-                      </div>
+                <Alert variant="info">
+                  <AlertDescription>
+                    {t('create.agents_info')}{' '}
+                    <Link href="/agents" className="underline font-medium" style={{ color: 'var(--accent)' }}>
+                      {t('create.agents_browse')}
+                    </Link>
+                  </AlertDescription>
+                </Alert>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <FieldLabel>{t('create.field.agents')}</FieldLabel>
+                    <button
+                      type="button"
+                      onClick={() => setPickerOpen('agents')}
+                      className="text-xs font-medium flex items-center gap-1"
+                      style={{ color: 'var(--accent)' }}
+                    >
+                      <span>◉</span> {t('picker.browse')}
+                    </button>
+                  </div>
+                  <input
+                    className={inputClass}
+                    style={inputStyle}
+                    value={agents}
+                    onChange={(e) => { setAgents(e.target.value); setAgentBudgetMap({}); }}
+                    placeholder={t('create.field.agents_placeholder')}
+                  />
+                </div>
+
+                {rawAgentList.length > 0 && (
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
                       <input
-                        className="input"
-                        value={agents}
-                        onChange={(e) => { setAgents(e.target.value); setAgentBudgetMap({}); }}
-                        placeholder="0x1234…, 0x5678… (comma-separated)"
+                        type="checkbox"
+                        checked={usePerAgentBudgets}
+                        onChange={(e) => setUsePerAgentBudgets(e.target.checked)}
+                        className="rounded"
                       />
-                    </div>
-
-                    {rawAgentList.length > 0 && (
-                      <div className="space-y-sm">
-                        <label className="flex items-center gap-sm cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={usePerAgentBudgets}
-                            onChange={(e) => setUsePerAgentBudgets(e.target.checked)}
-                            className="rounded"
-                          />
-                          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                            {t('create.field.per_agent_toggle')}
-                          </span>
-                        </label>
-                        {usePerAgentBudgets && (
-                          <div className="space-y-xs pl-md border-l-2 border-neutral-200 dark:border-neutral-700">
-                            <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('create.field.per_agent_hint')}</p>
-                            {rawAgentList.map((addr) => {
-                              const key = ethers.isAddress(addr) ? ethers.getAddress(addr) : addr;
-                              return (
-                                <div key={addr} className="flex items-center gap-sm">
-                                  <span className="text-xs font-mono text-neutral-600 dark:text-neutral-400 w-36 truncate">
-                                    {addr.slice(0, 10)}…{addr.slice(-6)}
-                                  </span>
-                                  <input
-                                    className="input text-sm"
-                                    type="number"
-                                    step="0.0001"
-                                    min="0"
-                                    placeholder={`Budget (${chain === 'base' ? selectedToken.symbol : 'LYX'})`}
-                                    value={agentBudgetMap[key] ?? ''}
-                                    onChange={(e) => setAgentBudgetMap((prev) => ({ ...prev, [key]: e.target.value }))}
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                      <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                        {t('create.field.per_agent_toggle')}
+                      </span>
+                    </label>
+                    {usePerAgentBudgets && (
+                      <div
+                        className="space-y-2 pl-4"
+                        style={{ borderLeft: '2px solid var(--border)' }}
+                      >
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('create.field.per_agent_hint')}</p>
+                        {rawAgentList.map((addr) => {
+                          const key = ethers.isAddress(addr) ? ethers.getAddress(addr) : addr;
+                          return (
+                            <div key={addr} className="flex items-center gap-3">
+                              <span className="text-xs font-mono w-36 truncate" style={{ color: 'var(--text-muted)' }}>
+                                {addr.slice(0, 10)}…{addr.slice(-6)}
+                              </span>
+                              <input
+                                className={cn(inputClass, 'flex-1')}
+                                style={inputStyle}
+                                type="number" step="0.0001" min="0"
+                                placeholder={`Budget (${chain === 'base' ? selectedToken.symbol : 'LYX'})`}
+                                value={agentBudgetMap[key] ?? ''}
+                                onChange={(e) => setAgentBudgetMap((prev) => ({ ...prev, [key]: e.target.value }))}
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
-                    )}
-
-                    <div className="flex justify-between pt-sm">
-                      <Button type="button" variant="secondary" onClick={() => setStep(3)}>Back</Button>
-                      <div className="flex gap-sm">
-                        {agents.trim() === '' && (
-                          <Button type="submit" variant="secondary" disabled={loading || !isConnected || !isRegistryConfigured}>
-                            {loading ? t('create.btn.deploying') : t('create.btn.skip_deploy')}
-                          </Button>
-                        )}
-                        <Button type="submit" variant="primary" disabled={loading || !isConnected || !isRegistryConfigured}>
-                          {loading ? t('create.btn.deploying') : t('create.btn.deploy')}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {status && (
-                      <Alert variant={status.startsWith('Error') ? 'error' : 'info'}>
-                        <AlertDescription>{status}</AlertDescription>
-                      </Alert>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                )}
+
+                {!isConnected && (
+                  <div
+                    className="rounded-xl px-4 py-3 space-y-2"
+                    style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+                  >
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                      {t('create.wallet_not_connected.desc')}
+                    </p>
+                    <ConnectButton.Custom>
+                      {({ openConnectModal, mounted }) =>
+                        mounted ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={async () => {
+                              if (chain === 'lukso' && hasUPExtension) {
+                                await connect();
+                              } else {
+                                window.setTimeout(() => openConnectModal(), 80);
+                              }
+                            }}
+                          >
+                            {t('create.btn.connect_wallet')}
+                          </Button>
+                        ) : null
+                      }
+                    </ConnectButton.Custom>
+                  </div>
+                )}
+
+                <div className="flex justify-between pt-2">
+                  <Button type="button" variant="secondary" onClick={() => setStep(3)}>{t('create.btn.back')}</Button>
+                  <div className="flex gap-2">
+                    {agents.trim() === '' && (
+                      <Button type="submit" variant="secondary" disabled={loading || !isConnected || !isRegistryConfigured}>
+                        {loading ? t('create.btn.deploying') : t('create.btn.skip_deploy')}
+                      </Button>
+                    )}
+                    <Button type="submit" variant="primary" disabled={loading || !isConnected || !isRegistryConfigured}>
+                      {loading ? t('create.btn.deploying') : t('create.btn.deploy')}
+                    </Button>
+                  </div>
+                </div>
+
+                {status && (
+                  <Alert variant={status.startsWith('Error') ? 'error' : 'info'}>
+                    <AlertDescription>{status}</AlertDescription>
+                  </Alert>
+                )}
+              </StepCard>
             </form>
           )}
         </div>
 
-        {/* Right: live preview (1 col) */}
+        {/* Right: live preview */}
         <div className="hidden lg:block">
           <VaultPreview
             vaultLabel={label}

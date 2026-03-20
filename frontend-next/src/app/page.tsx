@@ -144,7 +144,7 @@ function GoalCard({
 export default function LandingPage() {
   const router = useRouter();
   const { account, isConnected, registry } = useWeb3();
-  const { open: openOnboarding, setGoal, setWizardMode } = useOnboarding();
+  const { setGoal, setWizardMode } = useOnboarding();
   const { mode, setMode } = useMode();
   const { t } = useI18n();
   const { vaults, loading: vaultsLoading } = useVaults(registry, account);
@@ -160,11 +160,19 @@ export default function LandingPage() {
 
   // If connected but no vaults → stay on landing to start wizard
   const handleGetStarted = () => {
-    if (selectedGoal) {
-      setGoal(selectedGoal);
+    if (mode === 'advanced') {
+      setWizardMode('expert');
+      router.push('/vaults/create');
+      return;
     }
-    setWizardMode(mode === 'advanced' ? 'expert' : 'simple');
-    openOnboarding();
+
+    if (!selectedGoal) {
+      return;
+    }
+
+    setGoal(selectedGoal);
+    setWizardMode('simple');
+    router.push('/setup');
   };
 
   return (
@@ -242,6 +250,7 @@ export default function LandingPage() {
           onClick={handleGetStarted}
           className="vaultia-btn-primary text-base px-10 py-3 mb-4 animate-glow-pulse"
           style={{ animationDuration: '3s' }}
+          disabled={mode === 'simple' && !selectedGoal}
         >
           {t('landing.cta')} →
         </button>

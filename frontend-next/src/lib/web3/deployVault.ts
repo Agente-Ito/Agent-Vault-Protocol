@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import type { ContractTransactionReceipt, ContractTransactionResponse } from 'ethers';
 import type { RegistryContract } from '@/lib/web3/contracts';
+import type { RecipientEntry } from '@/context/OnboardingContext';
 
 export const AgentMode = {
   STRICT_PAYMENTS: 0,
@@ -21,7 +22,15 @@ const ANY_FUNCTION_SIG = 'ffffffff';
 const ALLOWED_CALL_TYPE_CALL_AND_VALUE = 3;
 
 export type DeployPeriodKey = 'daily' | 'weekly' | 'monthly';
-export type SimpleWizardGoal = 'pay_people' | 'pay_vendors' | 'subscriptions' | 'save_funds';
+export type SimpleWizardGoal =
+  | 'pay_people'
+  | 'pay_vendors'
+  | 'subscriptions'
+  | 'save_funds'
+  | 'payroll'
+  | 'grants'
+  | 'treasury_rebalance'
+  | 'tax_reserve';
 export type SimpleSafetyLevel = 'safe' | 'flexible' | 'advanced';
 export type SimpleExecutor = 'me' | 'vaultia' | 'my_agent';
 
@@ -48,13 +57,20 @@ export interface DeployRegistryVaultOptions {
 }
 
 export interface SimpleWizardDeployInput {
+  vaultName?: string;
   goal: SimpleWizardGoal | null;
-  recipients: string[];
+  recipients: RecipientEntry[];
   maxPerTx: string;
   frequency: DeployPeriodKey;
   agentEnabled: boolean;
   executor: SimpleExecutor;
   safetyLevel: SimpleSafetyLevel;
+}
+
+interface ValidateSimpleWizardOptions {
+  requireGoal?: boolean;
+  requireRecipients?: boolean;
+  strictExecutorSetup?: boolean;
 }
 
 export const PERIOD_MAP: Record<DeployPeriodKey, number> = {
@@ -72,6 +88,10 @@ const SIMPLE_GOAL_LABELS: Record<SimpleWizardGoal, string> = {
   pay_vendors: 'Vendor Payments',
   subscriptions: 'Subscriptions',
   save_funds: 'Savings',
+  payroll: 'Payroll',
+  grants: 'Grants',
+  treasury_rebalance: 'Treasury Rebalance',
+  tax_reserve: 'Tax Reserve',
 };
 
 const SIMPLE_GOAL_MODE: Record<SimpleWizardGoal, number> = {
@@ -79,7 +99,71 @@ const SIMPLE_GOAL_MODE: Record<SimpleWizardGoal, number> = {
   pay_vendors: AgentMode.SUBSCRIPTIONS,
   subscriptions: AgentMode.SUBSCRIPTIONS,
   save_funds: AgentMode.TREASURY_BALANCED,
+  payroll: AgentMode.STRICT_PAYMENTS,
+  grants: AgentMode.STRICT_PAYMENTS,
+  treasury_rebalance: AgentMode.TREASURY_BALANCED,
+  tax_reserve: AgentMode.TREASURY_BALANCED,
 };
+
+function goalNeedsRecipients(goal: SimpleWizardGoal | null): boolean {
+  return goal !== 'save_funds' && goal !== 'treasury_rebalance' && goal !== 'tax_reserve';
+}
+
+export function validateRecipient(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return 'empty';
+  if (!ethers.isAddress(trimmed)) return 'invalid_address';
+  return null;
+}
+
+export function normalizeRecipient(value: string): string {
+  return ethers.getAddress(value.trim());
+}
+
+export function validateSimpleWizardInput(
+  input: SimpleWizardDeployInput,
+  options: ValidateSimpleWizardOptions = {}
+): string[] {
+  const errors: string[] = [];
+
+  if (options.requireGoal !== false && !input.goal) {
+    errors.push('missing_goal');
+  }
+
+  if (!input.maxPerTx || Number.isNaN(Number(input.maxPerTx)) || Number(input.maxPerTx) <= 0) {
+    errors.push('invalid_amount');
+  }
+
+  const normalizedRecipients = new Set<string>();
+  for (const rawRecipient of input.recipients) {
+    const recipientError = validateRecipient(rawRecipient.address);
+    if (recipientError) {
+      errors.push(recipientError);
+      continue;
+    }
+
+    const normalized = normalizeRecipient(rawRecipient.address);
+    if (normalizedRecipients.has(normalized)) {
+      errors.push('duplicate_address');
+      continue;
+    }
+    normalizedRecipients.add(normalized);
+  }
+
+  if ((options.requireRecipients ?? true) && goalNeedsRecipients(input.goal) && normalizedRecipients.size === 0) {
+    errors.push('missing_recipients');
+  }
+
+  if (input.agentEnabled && input.executor === 'me') {
+    errors.push('manual_executor_invalid');
+  }
+
+  if (options.strictExecutorSetup && input.agentEnabled && input.executor === 'my_agent') {
+    errors.push('my_agent_requires_expert');
+  }
+
+  return [...new Set(errors)];
+}
 
 export function encodeAllowedCallsForTargets(targets: string[]): string {
   if (targets.length === 0) return '0x';
@@ -120,12 +204,17 @@ export function buildSimpleWizardDeployParams(input: SimpleWizardDeployInput): R
   const advanced = input.safetyLevel === 'advanced';
   const agentMode = advanced ? AgentMode.CUSTOM : SIMPLE_GOAL_MODE[goal];
   const manualExecution = !input.agentEnabled || input.executor === 'me';
+  const merchants = input.recipients
+    .filter((recipient) => !validateRecipient(recipient.address))
+    .map((recipient) => normalizeRecipient(recipient.address));
+
+  const label = input.vaultName?.trim() || SIMPLE_GOAL_LABELS[goal];
 
   return buildRegistryDeployParams({
     budget: parseBudgetToWei(input.maxPerTx, '1'),
     period: PERIOD_MAP[input.frequency],
-    merchants: input.recipients,
-    label: SIMPLE_GOAL_LABELS[goal],
+    merchants,
+    label,
     agentMode,
     allowSuperPermissions: advanced && !manualExecution,
     customAgentPermissions: advanced && !manualExecution ? PERM_POWER_USER : ethers.ZeroHash,

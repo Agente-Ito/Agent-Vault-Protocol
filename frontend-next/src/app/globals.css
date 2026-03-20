@@ -176,13 +176,8 @@ h4 {
 }
 
 p {
-  @apply leading-6 text-neutral-600;
-}
-
-@media (prefers-color-scheme: dark) {
-  p {
-    @apply text-neutral-400;
-  }
+  @apply leading-6;
+  color: var(--text-muted);
 }
 
 /* ============================================

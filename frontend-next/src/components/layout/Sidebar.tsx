@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useMode } from '@/context/ModeContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useI18n } from '@/context/I18nContext';
@@ -121,10 +121,11 @@ function ThemeToggle() {
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const router = useRouter();
   const pathname = usePathname();
   const { isAdvanced } = useMode();
   const { t } = useI18n();
-  const { completed, dismissed, open: openOnboarding } = useOnboarding();
+  const { completed, dismissed, setWizardMode } = useOnboarding();
   const { isDemo, enableDemo, disableDemo } = useDemo();
 
   const isActive = (href: string) =>
@@ -223,7 +224,16 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
 
           {/* Setup guide */}
           <button
-            onClick={() => { openOnboarding(); onClose(); }}
+            onClick={() => {
+              if (isAdvanced) {
+                setWizardMode('expert');
+                router.push('/vaults/create');
+              } else {
+                setWizardMode('simple');
+                router.push('/setup');
+              }
+              onClose();
+            }}
             className="w-full flex items-center gap-2 text-xs transition-colors"
             style={{ color: completed || dismissed ? 'var(--text-muted)' : 'var(--warning)' }}
           >

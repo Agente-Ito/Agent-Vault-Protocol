@@ -14,25 +14,20 @@ import { isBaseFactoryConfigured } from '@/lib/web3/baseContracts';
 import { Skeleton, SkeletonCard } from '@/components/common/Skeleton';
 import { Alert, AlertDescription } from '@/components/common/Alert';
 import { useI18n } from '@/context/I18nContext';
-import { cn } from '@/lib/utils/cn';
 
-// ─── Spend bar (same colour logic as BudgetTreeView) ─────────────────────────
+// ─── Spend bar ────────────────────────────────────────────────────────────────
 
 function SpendBar({ spent, total }: { spent: number; total: number }) {
   const pct = total > 0 ? Math.min((spent / total) * 100, 100) : 0;
   const ratio = total > 0 ? spent / total : 0;
-  const barColor =
-    ratio >= 1 ? 'bg-red-500' : ratio >= 0.85 ? 'bg-yellow-400' : 'bg-green-500';
+  const barColor = ratio >= 1 ? 'var(--blocked)' : ratio >= 0.85 ? 'var(--warning)' : 'var(--success)';
   return (
     <div className="mt-2">
-      <div className="h-1.5 w-full rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
-        <div
-          className={cn('h-full rounded-full transition-all duration-500', barColor)}
-          style={{ width: `${pct}%` }}
-        />
+      <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: 'var(--card-mid)' }}>
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColor }} />
       </div>
-      <div className="flex justify-between text-xs text-neutral-400 mt-0.5">
-        <span className={cn(ratio >= 1 && 'text-red-500 font-medium')}>
+      <div className="flex justify-between text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+        <span style={ratio >= 1 ? { color: 'var(--blocked)', fontWeight: 500 } : undefined}>
           {spent} LYX spent
         </span>
         <span>{total} LYX</span>
@@ -47,10 +42,8 @@ function VaultCard({ vault }: { vault: { safe: string; keyManager: string; polic
   const [expanded, setExpanded] = useState(false);
   const { detail, loading } = useVault(expanded ? vault.safe : null);
   const { t } = useI18n();
-
   const short = (addr: string) => `${addr.slice(0, 8)}…${addr.slice(-6)}`;
-
-  const spent = detail ? parseFloat(detail.policySummary.spent ?? '0') : 0;
+  const spent  = detail ? parseFloat(detail.policySummary.spent ?? '0') : 0;
   const budget = detail?.policySummary.budget ? parseFloat(detail.policySummary.budget) : 0;
 
   return (
@@ -75,40 +68,35 @@ function VaultCard({ vault }: { vault: { safe: string; keyManager: string; polic
 
         {detail && (
           <>
-            {/* Balance + expiry row */}
             <div className="flex items-end justify-between gap-sm">
               <div>
-                <p className="text-xs uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
                   {t('vaults.card.balance')}
                 </p>
-                <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 leading-tight">
+                <p className="text-2xl font-bold leading-tight" style={{ color: 'var(--text)' }}>
                   {detail.balance}
-                  <span className="text-sm font-medium text-neutral-400 ml-1">LYX</span>
+                  <span className="text-sm font-medium ml-1" style={{ color: 'var(--text-muted)' }}>LYX</span>
                 </p>
               </div>
               {detail.policySummary.expiration && detail.policySummary.expiration !== '0' && (
                 <div className="text-right">
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">{t('vaults.card.expires')}</p>
-                  <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('vaults.card.expires')}</p>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
                     {new Date(Number(detail.policySummary.expiration) * 1000).toLocaleDateString()}
                   </p>
                 </div>
               )}
             </div>
-
-            {/* Spend bar */}
-            {detail.policySummary.budget && (
-              <SpendBar spent={spent} total={budget} />
-            )}
+            {detail.policySummary.budget && <SpendBar spent={spent} total={budget} />}
           </>
         )}
 
-        {/* Expand toggle */}
         <button
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-controls={`vault-details-${vault.safe}`}
-          className="text-xs text-primary hover:underline text-left"
+          className="text-xs text-left hover:underline"
+          style={{ color: 'var(--primary)' }}
         >
           {expanded ? t('vaults.card.hide_details') : t('vaults.card.show_details')}
         </button>
@@ -116,20 +104,19 @@ function VaultCard({ vault }: { vault: { safe: string; keyManager: string; polic
         {expanded && detail && (
           <div
             id={`vault-details-${vault.safe}`}
-            className="space-y-xs text-xs font-mono text-neutral-600 dark:text-neutral-400 border-t border-neutral-100 dark:border-neutral-700 pt-md"
+            className="space-y-xs text-xs font-mono pt-md"
+            style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border)' }}
           >
-            <p><span className="font-sans font-medium text-neutral-500">{t('vaults.card.key_manager')}:</span> {short(detail.keyManager)}</p>
-            <p><span className="font-sans font-medium text-neutral-500">{t('vaults.card.policy_engine')}:</span> {short(detail.policyEngine)}</p>
+            <p><span className="font-sans font-medium">{t('vaults.card.key_manager')}:</span> {short(detail.keyManager)}</p>
+            <p><span className="font-sans font-medium">{t('vaults.card.policy_engine')}:</span> {short(detail.policyEngine)}</p>
             {detail.policySummary.merchants?.length ? (
-              <p><span className="font-sans font-medium text-neutral-500">{t('vaults.card.merchants')}:</span> {detail.policySummary.merchants.length} {t('vaults.card.whitelisted')}</p>
+              <p><span className="font-sans font-medium">{t('vaults.card.merchants')}:</span> {detail.policySummary.merchants.length} {t('vaults.card.whitelisted')}</p>
             ) : (
-              <p><span className="font-sans font-medium text-neutral-500">{t('vaults.card.merchants')}:</span> {t('vaults.card.no_restriction')}</p>
+              <p><span className="font-sans font-medium">{t('vaults.card.merchants')}:</span> {t('vaults.card.no_restriction')}</p>
             )}
             {!!detail.policySummary.warnings?.length && (
               <Alert variant="warning" className="mt-sm font-sans">
-                <AlertDescription>
-                  {detail.policySummary.warnings.join(' ')}
-                </AlertDescription>
+                <AlertDescription>{detail.policySummary.warnings.join(' ')}</AlertDescription>
               </Alert>
             )}
           </div>
@@ -147,7 +134,7 @@ function BaseVaultCard({ vault }: { vault: BaseVaultSummary }) {
   const short = (addr: string) => `${addr.slice(0, 8)}…${addr.slice(-6)}`;
 
   return (
-    <Card className="flex flex-col border-blue-200 dark:border-blue-800">
+    <Card className="flex flex-col" style={{ border: '1px solid rgba(60,242,255,0.25)' }}>
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
@@ -163,22 +150,26 @@ function BaseVaultCard({ vault }: { vault: BaseVaultSummary }) {
       <CardContent className="flex-1 flex flex-col gap-md">
         <div className="flex items-center gap-sm">
           <span className="text-xl">{vault.tokenEmoji}</span>
-          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{vault.tokenSymbol}</span>
-          <span className="text-xs text-neutral-400 font-mono">{short(vault.token)}</span>
+          <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{vault.tokenSymbol}</span>
+          <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{short(vault.token)}</span>
         </div>
 
         <button
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="text-xs text-primary hover:underline text-left"
+          className="text-xs hover:underline text-left"
+          style={{ color: 'var(--primary)' }}
         >
           {expanded ? t('vaults.card.hide_details') : t('vaults.card.show_details')}
         </button>
 
         {expanded && (
-          <div className="space-y-xs text-xs font-mono text-neutral-600 dark:text-neutral-400 border-t border-neutral-100 dark:border-neutral-700 pt-md">
-            <p><span className="font-sans font-medium text-neutral-500">{t('vaults.card.policy_engine')}:</span> {short(vault.policyEngine)}</p>
-            <p><span className="font-sans font-medium text-neutral-500">Vault:</span> {vault.vault}</p>
+          <div
+            className="space-y-xs text-xs font-mono pt-md"
+            style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border)' }}
+          >
+            <p><span className="font-sans font-medium">{t('vaults.card.policy_engine')}:</span> {short(vault.policyEngine)}</p>
+            <p><span className="font-sans font-medium">Vault:</span> {vault.vault}</p>
           </div>
         )}
       </CardContent>
@@ -200,10 +191,8 @@ export default function VaultsPage() {
     <div className="space-y-lg">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50">{t('vaults.title')}</h1>
-          <p className="text-neutral-600 dark:text-neutral-400 mt-xs">
-            {t('vaults.subtitle')}
-          </p>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{t('vaults.title')}</h1>
+          <p className="mt-xs" style={{ color: 'var(--text-muted)' }}>{t('vaults.subtitle')}</p>
         </div>
         <div className="flex gap-sm">
           <Button variant="secondary" size="sm" onClick={handleRefreshAll} disabled={loading || baseLoading}>
@@ -215,22 +204,22 @@ export default function VaultsPage() {
         </div>
       </div>
 
-      {/* Stats summary bar */}
       {isConnected && !loading && vaults.length > 0 && (
         <div className="grid grid-cols-3 gap-md">
           {[
-            { emoji: '🏦', label: t('vaults.stats.total'), value: String(vaults.length) },
-            { emoji: '✅', label: t('vaults.stats.active'), value: String(vaults.length) },
+            { emoji: '🏦', label: t('vaults.stats.total'),   value: String(vaults.length) },
+            { emoji: '✅', label: t('vaults.stats.active'),  value: String(vaults.length) },
             { emoji: '🤖', label: t('vaults.stats.network'), value: 'LUKSO' },
           ].map((s) => (
             <div
               key={s.label}
-              className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-4 flex items-center gap-3"
+              className="rounded-xl p-4 flex items-center gap-3"
+              style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
             >
               <span className="text-2xl">{s.emoji}</span>
               <div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">{s.label}</p>
-                <p className="text-xl font-bold text-neutral-900 dark:text-neutral-50">{s.value}</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+                <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>{s.value}</p>
               </div>
             </div>
           ))}
@@ -238,9 +227,7 @@ export default function VaultsPage() {
       )}
 
       {!isConnected && (
-        <Alert variant="info">
-          <AlertDescription>{t('vaults.connect_prompt')}</AlertDescription>
-        </Alert>
+        <Alert variant="info"><AlertDescription>{t('vaults.connect_prompt')}</AlertDescription></Alert>
       )}
 
       {isConnected && loading && (
@@ -250,7 +237,7 @@ export default function VaultsPage() {
       )}
 
       {isConnected && error && (
-        <Card><CardContent><p className="text-danger text-sm">Error: {error}</p></CardContent></Card>
+        <Card><CardContent><p className="text-sm" style={{ color: 'var(--blocked)' }}>Error: {error}</p></CardContent></Card>
       )}
 
       {isConnected && !loading && !error && vaults.length === 0 && (
@@ -260,9 +247,7 @@ export default function VaultsPage() {
             <CardDescription>{t('vaults.empty.subtitle')}</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-neutral-600 dark:text-neutral-400 mb-md">
-              {t('vaults.empty.description')}
-            </p>
+            <p className="mb-md" style={{ color: 'var(--text-muted)' }}>{t('vaults.empty.description')}</p>
             <Link href="/vaults/create">
               <Button variant="primary">{t('vaults.empty.cta')}</Button>
             </Link>
@@ -272,23 +257,18 @@ export default function VaultsPage() {
 
       {vaults.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-          {vaults.map((vault) => (
-            <VaultCard key={vault.safe} vault={vault} />
-          ))}
+          {vaults.map((vault) => <VaultCard key={vault.safe} vault={vault} />)}
         </div>
       )}
 
-      {/* ── Base vaults section ─────────────────────────────────────────────── */}
       {isConnected && isBaseFactoryConfigured() && (
         <div className="space-y-md">
-          <div className="border-t border-neutral-200 dark:border-neutral-700 pt-lg">
-            <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-50 flex items-center gap-sm">
+          <div className="pt-lg" style={{ borderTop: '1px solid var(--border)' }}>
+            <h2 className="text-xl font-bold flex items-center gap-sm" style={{ color: 'var(--text)' }}>
               <span className="text-2xl">🔵</span>
               {t('vaults.base.section_title')}
             </h2>
-            <p className="text-neutral-600 dark:text-neutral-400 text-sm mt-xs">
-              {t('vaults.base.section_subtitle')}
-            </p>
+            <p className="text-sm mt-xs" style={{ color: 'var(--text-muted)' }}>{t('vaults.base.section_subtitle')}</p>
           </div>
 
           {baseLoading && (
@@ -296,24 +276,19 @@ export default function VaultsPage() {
               <SkeletonCard /><SkeletonCard />
             </div>
           )}
-
           {baseError && (
-            <Card><CardContent><p className="text-danger text-sm">Error: {baseError}</p></CardContent></Card>
+            <Card><CardContent><p className="text-sm" style={{ color: 'var(--blocked)' }}>Error: {baseError}</p></CardContent></Card>
           )}
-
           {!baseLoading && !baseError && baseVaults.length === 0 && (
             <Card>
               <CardContent>
-                <p className="text-neutral-500 dark:text-neutral-400 text-sm py-sm">{t('vaults.base.empty')}</p>
+                <p className="text-sm py-sm" style={{ color: 'var(--text-muted)' }}>{t('vaults.base.empty')}</p>
               </CardContent>
             </Card>
           )}
-
           {baseVaults.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-              {baseVaults.map((vault) => (
-                <BaseVaultCard key={vault.vault} vault={vault} />
-              ))}
+              {baseVaults.map((vault) => <BaseVaultCard key={vault.vault} vault={vault} />)}
             </div>
           )}
         </div>

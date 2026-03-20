@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -9,7 +9,7 @@ import { Button } from '@/components/common/Button';
 import { Alert, AlertDescription } from '@/components/common/Alert';
 import { cn } from '@/lib/utils/cn';
 import { useOnboarding, MAX_STEPS } from '@/context/OnboardingContext';
-import type { GoalKey, FrequencyKey, ExecutorType } from '@/context/OnboardingContext';
+import type { GoalKey, FrequencyKey, ExecutorType, RecipientNetwork } from '@/context/OnboardingContext';
 import { useWeb3 } from '@/context/Web3Context';
 import { useI18n } from '@/context/I18nContext';
 import {
@@ -24,6 +24,7 @@ import {
   deployRegistryVault,
   PERIOD_MAP,
   parseBudgetToWei,
+  validateSimpleWizardInput,
 } from '@/lib/web3/deployVault';
 import { GoalCard } from '@/components/wizard/GoalCard';
 import { SafetyLevelChips } from '@/components/wizard/SafetyLevelChips';
@@ -43,8 +44,7 @@ function getErrorMessage(error: unknown): string {
 
 const EMOJIS = ['💰', '🏠', '🛒', '📈', '🎯', '✈️', '🏥', '🎓', '🎵', '⚡', '🚀', '🌐', '💎', '🔐', '🤝', '⛓️'];
 const SIMPLE_FREQS: FrequencyKey[] = ['daily', 'weekly', 'monthly'];
-const SIMPLE_EXECUTORS: ExecutorType[] = ['vaultia', 'me', 'my_agent'];
-const SIMPLE_STEP_COUNT = 4;
+const SIMPLE_EXECUTORS: ExecutorType[] = ['vaultia', 'my_agent'];
 const SIMPLE_STEP_LABEL_KEYS = [
   'wizard.step_label.goal',
   'wizard.step_label.limits',
@@ -59,10 +59,10 @@ function Step0({ onSelect }: { onSelect: (id: EntityType) => void }) {
   return (
     <div className="p-6 space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
+        <h2 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
           {t('onboarding.step0.title')}
         </h2>
-        <p className="text-sm text-neutral-500 mt-1">
+        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
           {t('onboarding.step0.subtitle')}
         </p>
       </div>
@@ -71,13 +71,16 @@ function Step0({ onSelect }: { onSelect: (id: EntityType) => void }) {
           <button
             key={entity.id}
             onClick={() => onSelect(entity.id)}
-            className="group text-left rounded-xl border-2 border-neutral-200 hover:border-primary-400 hover:bg-primary-50 p-4 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-neutral-700 dark:hover:border-primary-500 dark:hover:bg-neutral-800"
+            className="text-left rounded-xl p-4 transition-all duration-150 focus:outline-none"
+            style={{ background: 'var(--card-mid)', border: '1px solid var(--border)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; }}
           >
             <span className="text-3xl block mb-2">{entity.emoji}</span>
-            <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-50 leading-tight">
+            <p className="text-xs font-semibold leading-tight" style={{ color: 'var(--text)' }}>
               {t(entity.titleKey as Parameters<typeof t>[0])}
             </p>
-            <p className="text-xs text-neutral-400 mt-1 leading-relaxed line-clamp-2">
+            <p className="text-xs mt-1 leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)' }}>
               {t(entity.descKey as Parameters<typeof t>[0])}
             </p>
           </button>
@@ -99,13 +102,13 @@ function Step1({ onSelect }: { onSelect: (id: string) => void }) {
   return (
     <div className="p-6 space-y-5">
       <div>
-        <p className="text-xs font-semibold text-primary-500 uppercase tracking-widest mb-1">
+        <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--accent)' }}>
           {entity.emoji} {t(entity.titleKey as Parameters<typeof t>[0])}
         </p>
-        <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
+        <h2 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
           {t('onboarding.step1.title')}
         </h2>
-        <p className="text-sm text-neutral-500 mt-1">
+        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
           {t('onboarding.step1.subtitle')}
         </p>
       </div>
@@ -114,28 +117,32 @@ function Step1({ onSelect }: { onSelect: (id: string) => void }) {
           <button
             key={profile.id}
             onClick={() => onSelect(profile.id)}
-            className="group w-full text-left rounded-xl border-2 border-neutral-200 hover:border-primary-400 hover:bg-primary-50 p-4 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-neutral-700 dark:hover:border-primary-500 dark:hover:bg-neutral-800"
+            className="w-full text-left rounded-xl p-4 transition-all duration-150 focus:outline-none"
+            style={{ background: 'var(--card-mid)', border: '1px solid var(--border)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; }}
           >
             <div className="flex items-start gap-3">
               <span className="text-2xl flex-shrink-0">{profile.emoji}</span>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
                   {t(profile.titleKey as Parameters<typeof t>[0])}
                 </p>
-                <p className="text-xs text-neutral-400 mt-0.5 leading-relaxed">
+                <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                   {t(profile.descKey as Parameters<typeof t>[0])}
                 </p>
                 <div className="flex flex-wrap gap-1 mt-2">
                   {profile.subVaults.slice(0, 3).map((sv) => (
                     <span
                       key={sv.id}
-                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs bg-neutral-100 text-neutral-500 dark:bg-neutral-700 dark:text-neutral-400"
+                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs"
+                      style={{ background: 'var(--card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
                     >
                       {sv.emoji} {t(sv.titleKey as Parameters<typeof t>[0])}
                     </span>
                   ))}
                   {profile.subVaults.length > 3 && (
-                    <span className="text-xs text-neutral-400">
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                       +{profile.subVaults.length - 3} {t('onboarding.more')}
                     </span>
                   )}
@@ -166,17 +173,17 @@ function Step2() {
   return (
     <div className="p-6 space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
+        <h2 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
           {t('onboarding.step2.title')}
         </h2>
-        <p className="text-sm text-neutral-500 mt-1">
+        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
           {t('onboarding.step2.subtitle')}
         </p>
       </div>
 
       {/* Name */}
       <div className="space-y-1">
-        <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-widest">
+        <label className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
           {t('onboarding.step2.name_label')}
         </label>
         <input
@@ -184,13 +191,14 @@ function Step2() {
           value={vaultName}
           onChange={(e) => setVaultName(e.target.value)}
           placeholder={profile ? t(profile.vaultKey as Parameters<typeof t>[0]) : t('onboarding.step2.name_placeholder')}
-          className="w-full h-10 rounded-lg border border-neutral-300 px-3 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-neutral-50"
+          className="w-full h-10 rounded-lg px-3 text-sm focus:outline-none"
+          style={{ background: 'var(--card-mid)', border: '1px solid var(--border)', color: 'var(--text)' }}
         />
       </div>
 
       {/* Emoji */}
       <div className="space-y-2">
-        <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-widest">
+        <label className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
           {t('onboarding.step2.icon_label')}
         </label>
         <div className="flex flex-wrap gap-2">
@@ -198,12 +206,11 @@ function Step2() {
             <button
               key={e}
               onClick={() => setVaultEmoji(e)}
-              className={cn(
-                'w-9 h-9 rounded-lg border-2 text-lg flex items-center justify-center transition-all',
-                vaultEmoji === e
-                  ? 'border-primary-500 bg-primary-50 dark:bg-neutral-700'
-                  : 'border-neutral-200 hover:border-primary-300 dark:border-neutral-700'
-              )}
+              className="w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all"
+              style={{
+                background: vaultEmoji === e ? 'var(--card-mid)' : 'transparent',
+                border: `2px solid ${vaultEmoji === e ? 'var(--accent)' : 'var(--border)'}`,
+              }}
             >
               {e}
             </button>
@@ -214,10 +221,10 @@ function Step2() {
       {/* Sub-vault selection */}
       {profile && profile.subVaults.length > 0 && (
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-widest">
+          <label className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
             {t('onboarding.step2.subvaults_label')}
           </label>
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {t('onboarding.step2.subvaults_hint')}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -227,25 +234,27 @@ function Step2() {
                 <button
                   key={sv.id}
                   onClick={() => toggleSubVault(sv.id)}
-                  className={cn(
-                    'flex items-center gap-2 p-2.5 rounded-lg border-2 text-left transition-all',
-                    checked
-                      ? 'border-primary-400 bg-primary-50 dark:bg-neutral-700'
-                      : 'border-neutral-200 hover:border-neutral-300 dark:border-neutral-700'
-                  )}
+                  className="flex items-center gap-2 p-2.5 rounded-lg text-left transition-all"
+                  style={{
+                    background: checked ? 'var(--card-mid)' : 'var(--card)',
+                    border: `2px solid ${checked ? 'var(--accent)' : 'var(--border)'}`,
+                  }}
                 >
-                  <div className={cn(
-                    'w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border-2 transition-colors',
-                    checked ? 'border-primary-500 bg-primary-500' : 'border-neutral-300 dark:border-neutral-500'
-                  )}>
-                    {checked && <span className="text-white text-xs leading-none">✓</span>}
+                  <div
+                    className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background: checked ? 'var(--accent)' : 'transparent',
+                      border: `2px solid ${checked ? 'var(--accent)' : 'var(--border)'}`,
+                    }}
+                  >
+                    {checked && <span className="text-xs leading-none" style={{ color: '#000' }}>✓</span>}
                   </div>
                   <span className="text-sm">{sv.emoji}</span>
                   <div className="min-w-0">
-                    <p className="text-xs font-medium text-neutral-800 dark:text-neutral-100 leading-tight">
+                    <p className="text-xs font-medium leading-tight" style={{ color: 'var(--text)' }}>
                       {t(sv.titleKey as Parameters<typeof t>[0])}
                     </p>
-                    <p className="text-xs text-neutral-400 truncate">
+                    <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
                       {t(sv.descKey as Parameters<typeof t>[0])}
                     </p>
                   </div>
@@ -445,9 +454,29 @@ function SimpleStep0() {
 
 // ─── Simple wizard — Step 1: Limits ──────────────────────────────────────────
 
-function SimpleStep1() {
-  const { recipients, addRecipient, removeRecipient, maxPerTx, setMaxPerTx, frequency, setFrequency } = useOnboarding();
+const RECIPIENT_NETWORKS: Array<{ key: RecipientNetwork; labelKey: string }> = [
+  { key: 'up', labelKey: 'wizard.limits.network.up' },
+  { key: 'base', labelKey: 'wizard.limits.network.base' },
+];
+
+function SimpleStep1({ stepError }: { stepError: string | null }) {
+  const {
+    recipientNetwork,
+    setRecipientNetwork,
+    recipients,
+    addRecipient,
+    removeRecipient,
+    maxPerTx,
+    setMaxPerTx,
+    frequency,
+    setFrequency,
+  } = useOnboarding();
   const { t } = useI18n();
+
+  const placeholder = recipientNetwork === 'base'
+    ? t('wizard.limits.recipients_placeholder_base')
+    : t('wizard.limits.recipients_placeholder_up');
+
   return (
     <div className="p-6 space-y-5">
       <div>
@@ -461,12 +490,42 @@ function SimpleStep1() {
 
       <div className="space-y-1">
         <label className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+          {t('wizard.limits.network.label')}
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {RECIPIENT_NETWORKS.map((network) => {
+            const active = recipientNetwork === network.key;
+            return (
+              <button
+                key={network.key}
+                type="button"
+                onClick={() => setRecipientNetwork(network.key)}
+                className="rounded-xl px-3 py-3 text-left text-sm font-medium transition-all"
+                style={{
+                  background: active ? 'var(--card-mid)' : 'var(--card)',
+                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                  color: active ? 'var(--text)' : 'var(--text-muted)',
+                }}
+              >
+                {t(network.labelKey as Parameters<typeof t>[0])}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {t(`wizard.limits.network.${recipientNetwork}_hint` as Parameters<typeof t>[0])}
+        </p>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
           {t('wizard.limits.recipients')}
         </label>
         <RecipientField
           recipients={recipients}
           onAdd={addRecipient}
           onRemove={removeRecipient}
+          placeholder={placeholder}
         />
       </div>
 
@@ -510,6 +569,12 @@ function SimpleStep1() {
           ))}
         </div>
       </div>
+
+      {stepError && (
+        <p className="text-sm" style={{ color: 'var(--blocked)' }}>
+          {stepError}
+        </p>
+      )}
     </div>
   );
 }
@@ -518,8 +583,21 @@ function SimpleStep1() {
 
 function SimpleStep2() {
   const { agentEnabled, setAgentEnabled, executor, setExecutor, safetyLevel, setSafetyLevel } = useOnboarding();
-  const { isConnected } = useWeb3();
   const { t } = useI18n();
+
+  const handleToggleAgent = () => {
+    const nextEnabled = !agentEnabled;
+    setAgentEnabled(nextEnabled);
+    if (!nextEnabled) {
+      setExecutor('me');
+      setSafetyLevel('safe');
+      return;
+    }
+
+    if (executor === 'me') {
+      setExecutor('vaultia');
+    }
+  };
 
   return (
     <div className="p-6 space-y-5">
@@ -537,7 +615,7 @@ function SimpleStep2() {
         <div
           role="switch"
           aria-checked={agentEnabled}
-          onClick={() => setAgentEnabled(!agentEnabled)}
+          onClick={handleToggleAgent}
           className="relative w-11 h-6 rounded-full transition-colors cursor-pointer flex-shrink-0"
           style={{ background: agentEnabled ? 'var(--primary)' : 'var(--border)' }}
         >
@@ -585,6 +663,11 @@ function SimpleStep2() {
                       {t('wizard.automation.executor.vaultia_desc')}
                     </p>
                   )}
+                  {exec === 'my_agent' && (
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {t('wizard.automation.executor.my_agent_desc')}
+                    </p>
+                  )}
                 </div>
               </button>
             ))}
@@ -595,26 +678,52 @@ function SimpleStep2() {
             <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
               {t('wizard.automation.safety')}
             </p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              {t('wizard.automation.safe_default_note')}
+            </p>
             <SafetyLevelChips value={safetyLevel} onChange={setSafetyLevel} />
           </div>
         </>
       )}
 
-      {!isConnected && (
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          {t('wizard.automation.connect_later')}
-        </p>
+      {!agentEnabled && (
+        <div className="rounded-xl px-4 py-3" style={{ background: 'var(--card-mid)', border: '1px solid var(--border)' }}>
+          <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+            {t('wizard.automation.manual_state_title')}
+          </p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+            {t('wizard.automation.manual_state_desc')}
+          </p>
+        </div>
       )}
+
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        {t('wizard.automation.connect_later')}
+      </p>
     </div>
   );
 }
 
 // ─── Simple wizard — Step 3: Review + Deploy ──────────────────────────────────
 
-function SimpleStep3({ deploying, deployError }: { deploying: boolean; deployError: string | null }) {
-  const { goal, recipients, maxPerTx, frequency, agentEnabled, executor, safetyLevel } = useOnboarding();
-  const { isConnected, isRegistryConfigured } = useWeb3();
+function SimpleStep3({
+  deploying,
+  deployError,
+  onConnectWallet,
+}: {
+  deploying: boolean;
+  deployError: string | null;
+  onConnectWallet: (openConnectModal: () => void) => void;
+}) {
+  const { goal, recipientNetwork, recipients, maxPerTx, frequency, agentEnabled, executor, safetyLevel } = useOnboarding();
+  const { isConnected, isRegistryConfigured, hasUPExtension } = useWeb3();
   const { t } = useI18n();
+
+  const connectLabel = recipientNetwork === 'base'
+    ? t('wizard.review.connect_base')
+    : hasUPExtension
+      ? t('wizard.review.connect_up')
+      : t('wizard.review.connect_up_fallback');
 
   return (
     <div className="p-6 space-y-5">
@@ -637,7 +746,20 @@ function SimpleStep3({ deploying, deployError }: { deploying: boolean; deployErr
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             {t('wizard.review.connect_prompt')}
           </p>
-          <ConnectButton />
+          <ConnectButton.Custom>
+            {({ openConnectModal, mounted }) =>
+              mounted ? (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    onConnectWallet(openConnectModal);
+                  }}
+                >
+                  {connectLabel}
+                </Button>
+              ) : null
+            }
+          </ConnectButton.Custom>
         </div>
       )}
 
@@ -671,16 +793,17 @@ export function OnboardingModal() {
     entityType, entityProfile,
     vaultName, rootBudget, budgetPeriod,
     wizardMode,
-    goal, recipients, maxPerTx, frequency, agentEnabled, executor, safetyLevel,
+    goal, recipientNetwork, recipients, maxPerTx, frequency, agentEnabled, executor, safetyLevel,
     close, next, back, finish, dismissPermanently,
     setEntityType, setEntityProfile,
   } = useOnboarding();
 
-  const { registry, signer, isConnected, isRegistryConfigured } = useWeb3();
+  const { registry, signer, isConnected, isRegistryConfigured, connect, hasUPExtension } = useWeb3();
   const { t } = useI18n();
 
   // Simple wizard uses its own local step counter (0-3)
   const [simpleStep, setSimpleStep] = useState(0);
+  const [simpleError, setSimpleError] = useState<string | null>(null);
 
   const [neverShow, setNeverShow]     = React.useState(false);
   const [deploying, setDeploying]     = useState(false);
@@ -688,10 +811,90 @@ export function OnboardingModal() {
 
   const isSimple = wizardMode === 'simple';
 
+  useEffect(() => {
+    if (!visible || !isSimple) return;
+    setSimpleStep(goal ? 1 : 0);
+    setSimpleError(null);
+    setDeployError(null);
+  }, [visible, isSimple, goal]);
+
+  useEffect(() => {
+    if (!visible || wizardMode !== 'expert') return;
+    close();
+    router.push('/vaults/create');
+  }, [visible, wizardMode, close, router]);
+
   // ── Shared close handler ────────────────────────────────────────────────────
   const handleClose = () => {
     if (neverShow) dismissPermanently();
     else close();
+  };
+
+  const translateSimpleError = (errorCode: string) => {
+    const translations: Record<string, Parameters<typeof t>[0]> = {
+      missing_goal: 'wizard.goal.missing',
+      invalid_amount: 'wizard.limits.error.invalid_amount',
+      invalid_address: 'wizard.limits.error.invalid_address',
+      duplicate_address: 'wizard.limits.error.duplicate_address',
+      missing_recipients: 'wizard.limits.error.missing_recipients',
+      manual_executor_invalid: 'wizard.automation.error.manual_hidden',
+      my_agent_requires_expert: 'wizard.automation.error.my_agent_requires_expert',
+      base_requires_expert: 'wizard.automation.error.base_requires_expert',
+    };
+
+    const key = translations[errorCode];
+    return key ? t(key) : errorCode;
+  };
+
+  const validateSimple = (strictExecutorSetup = false) => {
+    const errors = validateSimpleWizardInput(
+      { goal, recipients, maxPerTx, frequency, agentEnabled, executor, safetyLevel },
+      { strictExecutorSetup }
+    );
+    return errors;
+  };
+
+  const handleConnectWallet = async (openConnectModal: () => void) => {
+    close();
+    if (recipientNetwork === 'up' && hasUPExtension) {
+      await connect();
+      return;
+    }
+
+    window.setTimeout(() => {
+      openConnectModal();
+    }, 80);
+  };
+
+  const handleSimpleNext = () => {
+    setSimpleError(null);
+
+    if (simpleStep === 0 && !goal) {
+      setSimpleError(translateSimpleError('missing_goal'));
+      return;
+    }
+
+    if (simpleStep === 1) {
+      const relevantErrors = validateSimple(false).filter((error) =>
+        ['invalid_amount', 'invalid_address', 'duplicate_address', 'missing_recipients'].includes(error)
+      );
+      if (relevantErrors.length > 0) {
+        setSimpleError(translateSimpleError(relevantErrors[0]));
+        return;
+      }
+    }
+
+    if (simpleStep === 2 && agentEnabled && executor === 'me') {
+      setSimpleError(translateSimpleError('manual_executor_invalid'));
+      return;
+    }
+
+    if (simpleStep === 2 && agentEnabled && executor === 'my_agent') {
+      setSimpleError(translateSimpleError('my_agent_requires_expert'));
+      return;
+    }
+
+    setSimpleStep((s) => s + 1);
   };
 
   // ── Expert mode handlers ────────────────────────────────────────────────────
@@ -727,6 +930,17 @@ export function OnboardingModal() {
 
   // ── Simple mode deploy ──────────────────────────────────────────────────────
   const handleSimpleDeploy = async () => {
+    if (recipientNetwork === 'base') {
+      setDeployError(translateSimpleError('base_requires_expert'));
+      return;
+    }
+
+    const validationErrors = validateSimple(true);
+    if (validationErrors.length > 0) {
+      setDeployError(translateSimpleError(validationErrors[0]));
+      return;
+    }
+
     if (!isRegistryConfigured || !registry || !signer) {
       setDeployError(t('onboarding.connect_wallet'));
       return;
@@ -756,13 +970,18 @@ export function OnboardingModal() {
   };
 
   if (dismissed && !visible) return null;
+  if (wizardMode === 'expert') return null;
 
   // ══════════════════════════════════════════════════════════════════════════
   // SIMPLE WIZARD RENDER
   // ══════════════════════════════════════════════════════════════════════════
   if (isSimple) {
-    const progressValue   = ((simpleStep + 1) / SIMPLE_STEP_COUNT) * 100;
-    const isLastSimple    = simpleStep === SIMPLE_STEP_COUNT - 1;
+    const simpleStepOrder = goal ? [1, 2, 3] : [0, 1, 2, 3];
+    const visibleStepKeys = simpleStepOrder.map((stepIndex) => SIMPLE_STEP_LABEL_KEYS[stepIndex]);
+    const visibleStepCount = visibleStepKeys.length;
+    const currentVisibleIndex = Math.max(0, simpleStepOrder.indexOf(simpleStep));
+    const progressValue   = ((currentVisibleIndex + 1) / visibleStepCount) * 100;
+    const isLastSimple    = currentVisibleIndex === visibleStepCount - 1;
     const canActivate     = isConnected && isRegistryConfigured && !deploying;
 
     return (
@@ -777,7 +996,7 @@ export function OnboardingModal() {
               {t('wizard.title')}
             </DialogTitle>
             <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-              {simpleStep + 1} / {SIMPLE_STEP_COUNT}
+              {currentVisibleIndex + 1} / {visibleStepCount}
             </span>
           </div>
 
@@ -785,15 +1004,15 @@ export function OnboardingModal() {
           <div className="px-6 pt-3">
             <Progress value={progressValue} className="h-1" />
             <div className="flex gap-2 mt-2">
-              {SIMPLE_STEP_LABEL_KEYS.map((key, i) => (
+              {visibleStepKeys.map((key, i) => (
                 <span
                   key={key}
                   className="text-xs flex-1 text-center transition-colors font-medium"
                   style={{
                     color:
-                      i < simpleStep  ? 'var(--success)' :
-                      i === simpleStep ? 'var(--accent)'  :
-                                         'var(--text-muted)',
+                      i < currentVisibleIndex  ? 'var(--success)' :
+                      i === currentVisibleIndex ? 'var(--accent)'  :
+                                                 'var(--text-muted)',
                   }}
                 >
                   {t(key)}
@@ -805,9 +1024,15 @@ export function OnboardingModal() {
           {/* Step content */}
           <div className="min-h-[340px] overflow-y-auto max-h-[62vh]">
             {simpleStep === 0 && <SimpleStep0 />}
-            {simpleStep === 1 && <SimpleStep1 />}
+            {simpleStep === 1 && <SimpleStep1 stepError={simpleError} />}
             {simpleStep === 2 && <SimpleStep2 />}
-            {simpleStep === 3 && <SimpleStep3 deploying={deploying} deployError={deployError} />}
+            {simpleStep === 3 && (
+              <SimpleStep3
+                deploying={deploying}
+                deployError={deployError}
+                onConnectWallet={handleConnectWallet}
+              />
+            )}
           </div>
 
           {/* Footer */}
@@ -815,7 +1040,7 @@ export function OnboardingModal() {
             className="px-6 pb-5 pt-4 flex items-center justify-between gap-3"
             style={{ borderTop: '1px solid var(--border)' }}
           >
-            {simpleStep === 0 ? (
+            {currentVisibleIndex === 0 ? (
               <Button variant="ghost" size="sm" onClick={handleClose}>
                 {t('onboarding.btn.skip')}
               </Button>
@@ -823,7 +1048,11 @@ export function OnboardingModal() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => { setDeployError(null); setSimpleStep((s) => Math.max(0, s - 1)); }}
+                onClick={() => {
+                  setDeployError(null);
+                  setSimpleError(null);
+                  setSimpleStep(simpleStepOrder[currentVisibleIndex - 1]);
+                }}
                 disabled={deploying}
               >
                 {t('onboarding.btn.back')}
@@ -831,7 +1060,7 @@ export function OnboardingModal() {
             )}
 
             {!isLastSimple ? (
-              <Button size="sm" onClick={() => setSimpleStep((s) => s + 1)}>
+              <Button size="sm" onClick={handleSimpleNext}>
                 {t('onboarding.btn.next')}
               </Button>
             ) : (

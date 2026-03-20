@@ -2,11 +2,11 @@
 
 import React from 'react';
 import { useI18n } from '@/context/I18nContext';
-import type { GoalKey, ExecutorType, SafetyLevel, FrequencyKey } from '@/context/OnboardingContext';
+import type { GoalKey, ExecutorType, SafetyLevel, FrequencyKey, RecipientEntry } from '@/context/OnboardingContext';
 
 interface WizardReviewSummaryProps {
   goal: GoalKey | null;
-  recipients: string[];
+  recipients: RecipientEntry[];
   maxPerTx: string;
   frequency: FrequencyKey;
   agentEnabled: boolean;
@@ -27,16 +27,19 @@ export function WizardReviewSummary({
 
   const amount = maxPerTx ? maxPerTx : '—';
   const count  = recipients.length;
+  const isManual = !agentEnabled;
 
   const freqLabel = t(`wizard.limits.freq.${frequency}` as Parameters<typeof t>[0]).toLowerCase();
-  const executorLabel = executor === 'vaultia'
+  const executorLabel = isManual
+    ? t('wizard.automation.executor.manual_state')
+    : executor === 'vaultia'
     ? t('wizard.automation.executor.vaultia')
     : executor === 'my_agent'
       ? t('wizard.automation.executor.my_agent')
       : t('wizard.automation.executor.me');
 
   // Build human-readable summary
-  const summary = agentEnabled && executor !== 'me'
+  const summary = !isManual
     ? t('wizard.review.summary')
         .replace('{amount}', amount)
         .replace('{count}', String(count || '—'))
@@ -45,13 +48,20 @@ export function WizardReviewSummary({
         .replace('{amount}', amount)
         .replace('{period}', freqLabel);
 
+    const recipientPreview = count > 0
+      ? recipients
+          .slice(0, 2)
+          .map((recipient) => recipient.label || `${recipient.address.slice(0, 6)}...${recipient.address.slice(-4)}`)
+          .join(', ')
+      : '—';
+
   const rows: { label: string; value: string }[] = [
     { label: t('wizard.review.goal'),       value: goal ? t(`wizard.goal.${goal}` as Parameters<typeof t>[0]) : '—' },
-    { label: t('wizard.review.recipients'), value: count > 0 ? `${count} address(es)` : '—' },
+      { label: t('wizard.review.recipients'), value: count > 0 ? `${recipientPreview}${count > 2 ? ` +${count - 2}` : ''}` : '—' },
     { label: t('wizard.review.max_per_tx'), value: amount },
     { label: t('wizard.review.frequency'),  value: freqLabel },
     { label: t('wizard.review.executor'),   value: executorLabel },
-    ...(agentEnabled && executor !== 'me' ? [{ label: t('wizard.review.safety'), value: t(`wizard.automation.safety.${safetyLevel}` as Parameters<typeof t>[0]) }] : []),
+    ...(!isManual ? [{ label: t('wizard.review.safety'), value: t(`wizard.automation.safety.${safetyLevel}` as Parameters<typeof t>[0]) }] : []),
   ];
 
   return (

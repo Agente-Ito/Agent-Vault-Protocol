@@ -22,11 +22,32 @@ export default function SettingsPage() {
     ? `https://universalprofile.cloud/${account}${chainId === 4201 ? '?network=testnet' : ''}`
     : null;
 
+  const modeCardStyle = (active: boolean) => ({
+    borderRadius: '0.75rem',
+    border: active ? '2px solid var(--primary)' : '2px solid var(--border)',
+    background: active ? 'rgba(123,97,255,0.08)' : 'var(--card)',
+    padding: '1rem',
+    cursor: 'pointer',
+    transition: 'border-color 0.2s, background 0.2s',
+  });
+
+  const langBtnStyle = (active: boolean) => ({
+    padding: '0.5rem 1rem',
+    borderRadius: '0.5rem',
+    border: active ? '2px solid var(--primary)' : '2px solid var(--border)',
+    background: active ? 'rgba(123,97,255,0.08)' : 'transparent',
+    color: active ? 'var(--primary)' : 'var(--text-muted)',
+    fontSize: '0.875rem',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  });
+
   return (
     <div className="space-y-lg max-w-2xl">
       <div>
-        <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50">{t('settings.title')}</h1>
-        <p className="text-neutral-600 dark:text-neutral-400 mt-xs">
+        <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{t('settings.title')}</h1>
+        <p className="mt-xs" style={{ color: 'var(--text-muted)' }}>
           {t('settings.subtitle')}
         </p>
       </div>
@@ -42,7 +63,7 @@ export default function SettingsPage() {
             /* Not connected */
             <div className="flex flex-col items-center gap-3 py-6 text-center">
               <span className="text-4xl">🌐</span>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-xs">
+              <p className="text-sm max-w-xs" style={{ color: 'var(--text-muted)' }}>
                 {t('up.profile.not_connected')}
               </p>
               {!hasUPExtension && (
@@ -50,7 +71,8 @@ export default function SettingsPage() {
                   href="https://chromewebstore.google.com/detail/universal-profiles/abpickdkkbnbcoepogfhkhennhfhehfn"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-primary-500 hover:underline"
+                  className="text-xs hover:underline"
+                  style={{ color: 'var(--primary)' }}
                 >
                   {t('up.install_extension')}
                 </a>
@@ -59,10 +81,13 @@ export default function SettingsPage() {
           ) : loading ? (
             /* Loading */
             <div className="flex items-center gap-3 py-4">
-              <div className="w-14 h-14 rounded-full bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
+              <div
+                className="w-14 h-14 rounded-full animate-pulse flex-shrink-0"
+                style={{ background: 'var(--card-mid)' }}
+              />
               <div className="space-y-2 flex-1">
-                <div className="h-4 w-32 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
-                <div className="h-3 w-48 bg-neutral-200 dark:bg-neutral-700 rounded animate-pulse" />
+                <div className="h-4 w-32 rounded animate-pulse" style={{ background: 'var(--card-mid)' }} />
+                <div className="h-3 w-48 rounded animate-pulse" style={{ background: 'var(--card-mid)' }} />
               </div>
             </div>
           ) : (
@@ -84,7 +109,12 @@ export default function SettingsPage() {
 
               {/* Avatar + identity */}
               <div className="flex items-start gap-4">
-                <div className={`flex-shrink-0 ${profile?.backgroundUrl ? '-mt-8 ring-4 ring-white dark:ring-neutral-800 rounded-full' : ''}`}>
+                <div
+                  className="flex-shrink-0"
+                  style={profile?.backgroundUrl
+                    ? { marginTop: '-2rem', borderRadius: '9999px', boxShadow: '0 0 0 4px var(--card)' }
+                    : undefined}
+                >
                   {profile?.avatarUrl ? (
                     <Image
                       src={profile.avatarUrl}
@@ -95,23 +125,28 @@ export default function SettingsPage() {
                       unoptimized
                     />
                   ) : (
-                    <div className="w-14 h-14 rounded-full bg-primary text-white flex items-center justify-center text-xl font-bold">
+                    <div
+                      className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold"
+                      style={{ background: 'var(--primary)', color: '#fff' }}
+                    >
                       {(profile?.name?.[0] ?? account[2] ?? '?').toUpperCase()}
                     </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-base font-bold text-neutral-900 dark:text-neutral-50">
+                    <p className="text-base font-bold" style={{ color: 'var(--text)' }}>
                       {profile?.name || t('up.profile.no_name')}
                     </p>
                     {isUniversalProfile && (
                       <Badge variant="primary">Universal Profile</Badge>
                     )}
                   </div>
-                  <p className="text-xs font-mono text-neutral-400 mt-0.5 truncate">{account}</p>
+                  <p className="text-xs font-mono mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                    {account}
+                  </p>
                   {profile?.description && (
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1 line-clamp-2">
+                    <p className="text-sm mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
                       {profile.description}
                     </p>
                   )}
@@ -124,7 +159,12 @@ export default function SettingsPage() {
                   {profile.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="text-xs px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300"
+                      className="text-xs px-2 py-0.5 rounded-full"
+                      style={{
+                        background: 'var(--card-mid)',
+                        color: 'var(--text-muted)',
+                        border: '1px solid var(--border)',
+                      }}
                     >
                       {tag}
                     </span>
@@ -141,7 +181,8 @@ export default function SettingsPage() {
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-primary-500 hover:underline"
+                      className="text-xs hover:underline"
+                      style={{ color: 'var(--primary)' }}
                     >
                       {link.title} ↗
                     </a>
@@ -151,11 +192,7 @@ export default function SettingsPage() {
 
               {/* View on UP explorer */}
               {upExplorerUrl && (
-                <a
-                  href={upExplorerUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
+                <a href={upExplorerUrl} target="_blank" rel="noopener noreferrer">
                   <Button variant="secondary" size="sm">
                     {t('up.profile.view')} ↗
                   </Button>
@@ -166,6 +203,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ─── Mode selector ────────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
           <CardTitle>{t('settings.mode.title')}</CardTitle>
@@ -173,36 +211,29 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-md">
           <div className="space-y-sm">
-            <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
               {t('settings.mode.current')}: <Badge variant={mode === 'simple' ? 'success' : 'primary'}>{mode}</Badge>
             </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
             {/* Simple Mode */}
-            <div className={`rounded-lg border-2 p-md transition-colors cursor-pointer ${
-              mode === 'simple'
-                ? 'border-primary bg-blue-50 dark:bg-blue-900/20'
-                : 'border-neutral-200 dark:border-neutral-700'
-            }`}
-            onClick={() => setMode('simple')}
-            >
-              <h4 className="font-semibold text-neutral-900 dark:text-neutral-50">{t('settings.mode.simple.title')}</h4>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-sm">
+            <div style={modeCardStyle(mode === 'simple')} onClick={() => setMode('simple')}>
+              <h4 className="font-semibold" style={{ color: 'var(--text)' }}>{t('settings.mode.simple.title')}</h4>
+              <p className="text-sm mt-sm" style={{ color: 'var(--text-muted)' }}>
                 {t('settings.mode.simple.desc')}
               </p>
-              <ul className="text-xs text-neutral-600 dark:text-neutral-400 mt-sm space-y-xs">
+              <ul className="text-xs mt-sm space-y-xs" style={{ color: 'var(--text-muted)' }}>
                 <li>✓ {t('settings.mode.simple.f1')}</li>
                 <li>✓ {t('settings.mode.simple.f2')}</li>
                 <li>✓ {t('settings.mode.simple.f3')}</li>
                 <li>✓ {t('settings.mode.simple.f4')}</li>
               </ul>
-              {mode === 'simple' && (
+              {mode === 'simple' ? (
                 <Button size="sm" variant="primary" className="mt-md w-full">
                   {t('settings.mode.btn.active')}
                 </Button>
-              )}
-              {mode !== 'simple' && (
+              ) : (
                 <Button size="sm" variant="secondary" className="mt-md w-full" onClick={() => setMode('simple')}>
                   {t('settings.mode.btn.switch_simple')}
                 </Button>
@@ -210,29 +241,24 @@ export default function SettingsPage() {
             </div>
 
             {/* Advanced Mode */}
-            <div className={`rounded-lg border-2 p-md transition-colors cursor-pointer ${
-              mode === 'advanced'
-                ? 'border-primary bg-blue-50 dark:bg-blue-900/20'
-                : 'border-neutral-200 dark:border-neutral-700'
-            }`}
-            onClick={() => setMode('advanced')}
-            >
-              <h4 className="font-semibold text-neutral-900 dark:text-neutral-50">{t('settings.mode.advanced.title')} <Badge variant="primary">Pro</Badge></h4>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-sm">
+            <div style={modeCardStyle(mode === 'advanced')} onClick={() => setMode('advanced')}>
+              <h4 className="font-semibold" style={{ color: 'var(--text)' }}>
+                {t('settings.mode.advanced.title')} <Badge variant="primary">Pro</Badge>
+              </h4>
+              <p className="text-sm mt-sm" style={{ color: 'var(--text-muted)' }}>
                 {t('settings.mode.advanced.desc')}
               </p>
-              <ul className="text-xs text-neutral-600 dark:text-neutral-400 mt-sm space-y-xs">
+              <ul className="text-xs mt-sm space-y-xs" style={{ color: 'var(--text-muted)' }}>
                 <li>✓ {t('settings.mode.advanced.f1')}</li>
                 <li>✓ {t('settings.mode.advanced.f2')}</li>
                 <li>✓ {t('settings.mode.advanced.f3')}</li>
                 <li>✓ {t('settings.mode.advanced.f4')}</li>
               </ul>
-              {mode === 'advanced' && (
+              {mode === 'advanced' ? (
                 <Button size="sm" variant="primary" className="mt-md w-full">
                   {t('settings.mode.btn.active')}
                 </Button>
-              )}
-              {mode !== 'advanced' && (
+              ) : (
                 <Button size="sm" variant="secondary" className="mt-md w-full" onClick={() => setMode('advanced')}>
                   {t('settings.mode.btn.switch_advanced')}
                 </Button>
@@ -242,6 +268,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ─── Language selector ────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
           <CardTitle>{t('settings.language.title')}</CardTitle>
@@ -249,30 +276,17 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex gap-sm">
-            <button
-              onClick={() => setLocale('en')}
-              className={`px-md py-sm rounded-md border-2 text-sm font-medium transition-colors ${
-                locale === 'en'
-                  ? 'border-primary bg-blue-50 text-primary dark:bg-blue-900/20'
-                  : 'border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400'
-              }`}
-            >
+            <button style={langBtnStyle(locale === 'en')} onClick={() => setLocale('en')}>
               🇬🇧 English
             </button>
-            <button
-              onClick={() => setLocale('es')}
-              className={`px-md py-sm rounded-md border-2 text-sm font-medium transition-colors ${
-                locale === 'es'
-                  ? 'border-primary bg-blue-50 text-primary dark:bg-blue-900/20'
-                  : 'border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400'
-              }`}
-            >
+            <button style={langBtnStyle(locale === 'es')} onClick={() => setLocale('es')}>
               🇪🇸 Español
             </button>
           </div>
         </CardContent>
       </Card>
 
+      {/* ─── Network info ─────────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
           <CardTitle>{t('settings.network.title')}</CardTitle>
@@ -281,12 +295,12 @@ export default function SettingsPage() {
         <CardContent>
           <div className="space-y-sm">
             <div>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">{t('settings.network.label')}</p>
-              <p className="font-semibold text-neutral-900 dark:text-neutral-50">{t('settings.network.value')}</p>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('settings.network.label')}</p>
+              <p className="font-semibold" style={{ color: 'var(--text)' }}>{t('settings.network.value')}</p>
             </div>
             <div>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">{t('settings.network.registry')}</p>
-              <p className="font-mono text-sm text-neutral-700 dark:text-neutral-300">
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('settings.network.registry')}</p>
+              <p className="font-mono text-sm" style={{ color: 'var(--text-muted)' }}>
                 {process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || t('settings.network.not_configured')}
               </p>
             </div>

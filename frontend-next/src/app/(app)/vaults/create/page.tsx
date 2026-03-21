@@ -23,14 +23,6 @@ import {
   permissionHexForMode,
   PERM_POWER_USER,
 } from '@/lib/web3/deployVault';
-import {
-  getBaseTokenOptions,
-  getBaseVaultFactoryContract,
-  switchToBase,
-  getBaseSigner,
-  isBaseFactoryConfigured,
-  BASE_CHAIN_ID,
-} from '@/lib/web3/baseContracts';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -149,12 +141,12 @@ function PreviewRow({ icon, label, value, active }: { icon: string; label: strin
 
 function VaultPreview({
   vaultLabel, budget, period, hasExpiry, expiryDate, agentCount, merchantCount,
-  chain, tokenSymbol, securityLabel, securityRisk,
+  tokenSymbol, securityLabel, securityRisk,
 }: {
   vaultLabel: string; budget: string; period: string;
   hasExpiry: boolean; expiryDate: string;
   agentCount: number; merchantCount: number;
-  chain: 'lukso' | 'base'; tokenSymbol: string;
+  tokenSymbol: string;
   securityLabel: string; securityRisk: 'low' | 'medium' | 'high';
 }) {
   const { t } = useI18n();
@@ -187,9 +179,7 @@ function VaultPreview({
           <p className="text-base font-bold leading-tight" style={{ color: 'var(--text)' }}>
             {vaultLabel || t('create.preview.unnamed')}
           </p>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            {chain === 'base' ? '🔵 Base' : '🌐 LUKSO'}
-          </p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>🌐 LUKSO</p>
         </div>
       </div>
       <div>
@@ -352,13 +342,7 @@ export default function CreateVaultPage() {
   const { registry, signer, isConnected, isRegistryConfigured, connect, hasUPExtension } = useWeb3();
   const { t } = useI18n();
 
-  const [chain, setChain]                               = useState<'lukso' | 'base'>('lukso');
-  const baseTokenOptions = getBaseTokenOptions(BASE_CHAIN_ID);
-  const [baseToken, setBaseToken]                       = useState(baseTokenOptions[0].address);
-  const selectedToken = baseTokenOptions.find((tok) => tok.address === baseToken) ?? baseTokenOptions[0];
   const [luksoToken, setLuksoToken]                     = useState('');
-
-  const [deployedBase, setDeployedBase]                 = useState<{ vault: string; policyEngine: string } | null>(null);
   const [label, setLabel]                               = useState('');
   const [budget, setBudget]                             = useState('0.5');
   const [period, setPeriod]                             = useState('1');
@@ -430,47 +414,8 @@ export default function CreateVaultPage() {
   const handleStep2Next = () => { setStepTouched((p) => ({ ...p, 2: true })); if (step2Valid) setStep(3); };
   const handleStep3Next = () => setStep(4);
 
-  // ── Base deploy ──────────────────────────────────────────────────────────────
-  const onSubmitBase = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isBaseFactoryConfigured()) { setStatus('Error: NEXT_PUBLIC_BASE_VAULT_FACTORY_ADDRESS not configured.'); return; }
-    setLoading(true);
-    setStatus(t('create.base.switching'));
-    try {
-      await switchToBase();
-      const baseSigner   = await getBaseSigner();
-      const signerAddress = await baseSigner.getAddress();
-      const agentList    = parseAddressList(agents, 'Agents');
-      const merchantList = parseAddressList(merchants, 'Merchant whitelist');
-      const expirationUnix = hasExpiry && expiryDate ? BigInt(Math.floor(new Date(expiryDate).getTime() / 1000)) : BigInt(0);
-      if (hasExpiry && expiryDate && expirationUnix <= BigInt(Math.floor(Date.now() / 1000))) throw new Error('Expiration date must be in the future.');
-      const decimals     = selectedToken.decimals;
-      const budgetWei    = ethers.parseUnits(budget, decimals);
-      const agentBudgetsList = usePerAgentBudgets && agentList.length > 0
-        ? agentList.map((addr) => { const configured = agentBudgetMap[addr]; if (!configured) throw new Error(`Missing budget for agent ${addr}.`); return ethers.parseUnits(configured, decimals); })
-        : [];
-      setStatus(t('create.status.sending'));
-      const factory = getBaseVaultFactoryContract(baseSigner);
-      const tx = await factory.deployVault({ label, token: baseToken, budget: budgetWei, period: Number(period), tokenBudgets: [], expiration: expirationUnix, agents: agentList, agentBudgets: agentBudgetsList, merchants: merchantList });
-      setStatus(t('create.status.confirming'));
-      const receipt = await tx.wait();
-      if (!receipt) throw new Error('Transaction receipt not available');
-      const iface = factory.interface;
-      let vaultAddr = '', peAddr = '';
-      for (const log of receipt.logs) { try { const parsed = iface.parseLog(log); if (parsed?.name === 'VaultDeployed') { vaultAddr = parsed.args.vault; peAddr = parsed.args.policyEngine; } } catch { /* ignore */ } }
-      if (!vaultAddr) { const latest = await factory.getVaults(signerAddress); if (latest.length > 0) { const found = latest[latest.length - 1]; vaultAddr = found.vault; peAddr = found.policyEngine; } }
-      setDeployedBase({ vault: vaultAddr, policyEngine: peAddr });
-      setStatus(t('create.status.deployed'));
-    } catch (err: unknown) {
-      setStatus('Error: ' + getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // ── LUKSO deploy ─────────────────────────────────────────────────────────────
   const onSubmit = async (e: React.FormEvent) => {
-    if (chain === 'base') return onSubmitBase(e);
     e.preventDefault();
     if (!isRegistryConfigured) { setStatus('Error: Registry address not configured. Set NEXT_PUBLIC_REGISTRY_ADDRESS in .env.local.'); return; }
     if (!registry || !signer) { setStatus('Error: Connect your wallet first.'); return; }
@@ -524,35 +469,7 @@ export default function CreateVaultPage() {
     }
   };
 
-  // ── Success: Base ─────────────────────────────────────────────────────────────
-  if (deployedBase) {
-    return (
-      <div className="space-y-6 max-w-2xl">
-        <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{t('create.success.base.title')}</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>{t('create.success.base.subtitle')}</p>
-        </div>
-        <Alert variant="success">
-          <AlertTitle>🔵 {t('create.success.base_network')}</AlertTitle>
-          <AlertDescription>{t('create.success.base.note')}</AlertDescription>
-        </Alert>
-        <div className="rounded-2xl p-5 space-y-4" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-          {[{ label: t('create.success.contract.vault'), value: deployedBase.vault }, { label: t('create.success.contract.policy_engine'), value: deployedBase.policyEngine }].map(({ label: lbl, value }) => (
-            <div key={lbl}>
-              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--text-muted)' }}>{lbl}</p>
-              <p className="text-sm font-mono break-all" style={{ color: 'var(--text)' }}>{value || '—'}</p>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-3">
-          <Button variant="primary" onClick={() => router.push('/vaults')}>{t('create.success.view_vaults')}</Button>
-          <Button variant="secondary" onClick={() => { setDeployedBase(null); setStatus(''); setStep(1); }}>{t('create.success.create_another')}</Button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Success: LUKSO ────────────────────────────────────────────────────────────
+  // ── Success ───────────────────────────────────────────────────────────────────
   if (deployed) {
     return (
       <div className="space-y-6 max-w-2xl">
@@ -634,32 +551,37 @@ export default function CreateVaultPage() {
             {t('create.chain.label')}
           </p>
           <div className="flex gap-3">
-            {(['lukso', 'base'] as const).map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setChain(c)}
-                className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all"
-                style={{
-                  background: chain === c ? 'var(--card-mid)' : 'var(--bg)',
-                  border: `1px solid ${chain === c ? 'var(--accent)' : 'var(--border)'}`,
-                  color: chain === c ? 'var(--text)' : 'var(--text-muted)',
-                  boxShadow: chain === c ? '0 0 0 1px var(--accent)' : 'none',
-                }}
-              >
-                <span>{c === 'lukso' ? '🌐' : '🔵'}</span>
-                {t(c === 'lukso' ? 'create.chain.lukso' : 'create.chain.base')}
-              </button>
-            ))}
+            {/* LUKSO — active */}
+            <div
+              className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold"
+              style={{
+                background: 'var(--card-mid)',
+                border: '1px solid var(--accent)',
+                color: 'var(--text)',
+                boxShadow: '0 0 0 1px var(--accent)',
+              }}
+            >
+              <span>🌐</span>
+              <span>{t('create.chain.lukso')}</span>
+              <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full font-medium" style={{ background: 'rgba(34,255,178,0.15)', color: 'var(--success)' }}>✓</span>
+            </div>
+            {/* Base — coming soon */}
+            <div
+              className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold opacity-50 cursor-not-allowed"
+              style={{
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <span>🔵</span>
+              <span>{t('create.chain.base')}</span>
+              <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full font-medium" style={{ background: 'var(--card-mid)', color: 'var(--text-muted)' }}>
+                {t('wizard.limits.network.coming_soon')}
+              </span>
+            </div>
           </div>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('create.chain.hint')}</p>
-
-          {chain === 'base' && (
-            <Alert variant="info">
-              <AlertTitle>{t('create.base.automation_note_title')}</AlertTitle>
-              <AlertDescription>{t('create.base.automation_note_desc')}</AlertDescription>
-            </Alert>
-          )}
         </div>
       )}
 
@@ -725,31 +647,7 @@ export default function CreateVaultPage() {
                 <FieldError message={labelError} />
               </div>
 
-              {chain === 'base' && (
-                <div>
-                  <FieldLabel>{t('create.field.token')}</FieldLabel>
-                  <div className="flex gap-2 flex-wrap">
-                    {baseTokenOptions.map((tok) => (
-                      <button
-                        key={tok.address}
-                        type="button"
-                        onClick={() => setBaseToken(tok.address)}
-                        className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
-                        style={{
-                          background: baseToken === tok.address ? 'var(--card-mid)' : 'var(--bg)',
-                          border: `1px solid ${baseToken === tok.address ? 'var(--accent)' : 'var(--border)'}`,
-                          color: baseToken === tok.address ? 'var(--text)' : 'var(--text-muted)',
-                        }}
-                      >
-                        {tok.emoji} {tok.symbol}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {chain === 'lukso' && (
-                <div>
+              <div>
                   <FieldLabel>{t('create.field.lukso_token')}</FieldLabel>
                   <input
                     className={`${inputClass} font-mono`}
@@ -762,15 +660,10 @@ export default function CreateVaultPage() {
                     {t('create.field.lukso_token_hint')}
                   </p>
                 </div>
-              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <FieldLabel>
-                    {chain === 'base'
-                      ? `${t('create.field.budget_token')} (${selectedToken.symbol})`
-                      : t('create.field.budget')}
-                  </FieldLabel>
+                  <FieldLabel>{t('create.field.budget')}</FieldLabel>
                   <input
                     className={inputClass}
                     style={{ ...inputStyle, borderColor: budgetError ? 'var(--blocked)' : 'var(--border)' }}
@@ -975,14 +868,12 @@ export default function CreateVaultPage() {
                 <div
                   className="rounded-xl px-4 py-3 text-xs leading-relaxed"
                   style={{
-                    background: chain === 'lukso' ? 'rgba(34,255,178,0.07)' : 'rgba(60,242,255,0.05)',
-                    border: chain === 'lukso' ? '1px solid rgba(34,255,178,0.2)' : '1px solid rgba(60,242,255,0.2)',
+                    background: 'rgba(34,255,178,0.07)',
+                    border: '1px solid rgba(34,255,178,0.2)',
                     color: 'var(--text-muted)',
                   }}
                 >
-                  {chain === 'lukso'
-                    ? t('create.agents.lukso_automation_note')
-                    : t('create.agents.base_automation_note')}
+                  {t('create.agents.lukso_automation_note')}
                 </div>
 
                 <div>
@@ -1060,7 +951,7 @@ export default function CreateVaultPage() {
                                 className={cn(inputClass, 'flex-1')}
                                 style={inputStyle}
                                 type="number" step="0.0001" min="0"
-                                placeholder={`Budget (${chain === 'base' ? selectedToken.symbol : 'LYX'})`}
+                                placeholder="Budget (LYX)"
                                 value={agentBudgetMap[key] ?? ''}
                                 onChange={(e) => setAgentBudgetMap((prev) => ({ ...prev, [key]: e.target.value }))}
                               />
@@ -1087,7 +978,7 @@ export default function CreateVaultPage() {
                             type="button"
                             size="sm"
                             onClick={async () => {
-                              if (chain === 'lukso' && hasUPExtension) {
+                              if (hasUPExtension) {
                                 await connect();
                               } else {
                                 window.setTimeout(() => openConnectModal(), 80);
@@ -1106,11 +997,11 @@ export default function CreateVaultPage() {
                   <Button type="button" variant="secondary" onClick={() => setStep(3)}>{t('create.btn.back')}</Button>
                   <div className="flex gap-2">
                     {agents.trim() === '' && (
-                      <Button type="submit" variant="secondary" disabled={loading || !isConnected || (chain === 'lukso' ? !isRegistryConfigured : !isBaseFactoryConfigured())}>
+                      <Button type="submit" variant="secondary" disabled={loading || !isConnected || !isRegistryConfigured}>
                         {loading ? t('create.btn.deploying') : t('create.btn.skip_deploy')}
                       </Button>
                     )}
-                    <Button type="submit" variant="primary" disabled={loading || !isConnected || (chain === 'lukso' ? !isRegistryConfigured : !isBaseFactoryConfigured())}>
+                    <Button type="submit" variant="primary" disabled={loading || !isConnected || !isRegistryConfigured}>
                       {loading ? t('create.btn.deploying') : t('create.btn.deploy')}
                     </Button>
                   </div>
@@ -1136,8 +1027,7 @@ export default function CreateVaultPage() {
             expiryDate={expiryDate}
             agentCount={rawAgentList.length}
             merchantCount={merchantCount}
-            chain={chain}
-            tokenSymbol={chain === 'base' ? selectedToken.symbol : (luksoToken.trim() ? `${luksoToken.slice(0, 6)}…` : 'LYX')}
+            tokenSymbol={luksoToken.trim() ? `${luksoToken.slice(0, 6)}…` : 'LYX'}
             securityLabel={securityLabel}
             securityRisk={securityRisk}
           />

@@ -12,6 +12,7 @@ interface WizardReviewSummaryProps {
   agentEnabled: boolean;
   executor: ExecutorType;
   safetyLevel: SafetyLevel;
+  agentAddress?: string;
 }
 
 export function WizardReviewSummary({
@@ -22,6 +23,7 @@ export function WizardReviewSummary({
   agentEnabled,
   executor,
   safetyLevel,
+  agentAddress,
 }: WizardReviewSummaryProps) {
   const { t } = useI18n();
 
@@ -48,19 +50,27 @@ export function WizardReviewSummary({
         .replace('{amount}', amount)
         .replace('{period}', freqLabel);
 
-    const recipientPreview = count > 0
-      ? recipients
-          .slice(0, 2)
-          .map((recipient) => recipient.label || `${recipient.address.slice(0, 6)}...${recipient.address.slice(-4)}`)
-          .join(', ')
-      : '—';
+  const recipientPreview = count > 0
+    ? recipients
+        .slice(0, 2)
+        .map((recipient) => recipient.label || `${recipient.address.slice(0, 6)}...${recipient.address.slice(-4)}`)
+        .join(', ')
+    : '—';
+
+  const trimmedAgentAddress = agentAddress?.trim();
+  const agentAddressDisplay = trimmedAgentAddress
+    ? `${trimmedAgentAddress.slice(0, 8)}...${trimmedAgentAddress.slice(-6)}`
+    : null;
 
   const rows: { label: string; value: string }[] = [
     { label: t('wizard.review.goal'),       value: goal ? t(`wizard.goal.${goal}` as Parameters<typeof t>[0]) : '—' },
-      { label: t('wizard.review.recipients'), value: count > 0 ? `${recipientPreview}${count > 2 ? ` +${count - 2}` : ''}` : '—' },
+    { label: t('wizard.review.recipients'), value: count > 0 ? `${recipientPreview}${count > 2 ? ` +${count - 2}` : ''}` : '—' },
     { label: t('wizard.review.max_per_tx'), value: amount },
     { label: t('wizard.review.frequency'),  value: freqLabel },
     { label: t('wizard.review.executor'),   value: executorLabel },
+    ...(executor === 'my_agent' && agentAddressDisplay
+      ? [{ label: t('wizard.review.agent_address'), value: agentAddressDisplay }]
+      : []),
     ...(!isManual ? [{ label: t('wizard.review.safety'), value: t(`wizard.automation.safety.${safetyLevel}` as Parameters<typeof t>[0]) }] : []),
   ];
 

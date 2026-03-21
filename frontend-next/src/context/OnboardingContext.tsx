@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import type { EntityType } from '@/lib/onboarding/entityData';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,23 +25,7 @@ export interface RecipientEntry {
 }
 
 interface OnboardingState {
-  step: number;           // 0-4
-  visible: boolean;
   completed: boolean;
-  dismissed: boolean;
-  // Step 0: entity type (legacy expert mode)
-  entityType: EntityType | null;
-  // Step 1: profile within entity (legacy)
-  entityProfile: string | null;
-  // Step 2: vault setup (legacy)
-  vaultName: string;
-  vaultEmoji: string;
-  selectedSubVaults: string[];
-  // Step 3: budget (legacy)
-  rootBudget: string;
-  budgetPeriod: 'daily' | 'weekly' | 'monthly';
-
-  // ── New wizard fields (simple flow) ──────────────────────────────────────
   wizardMode: WizardMode;
   wizardVaultName: string;
   goal: GoalKey | null;
@@ -60,20 +43,7 @@ interface OnboardingState {
 }
 
 interface OnboardingContextType extends OnboardingState {
-  open: () => void;
-  close: () => void;
-  next: () => void;
-  back: () => void;
   finish: () => void;
-  dismissPermanently: () => void;
-  setEntityType: (t: EntityType) => void;
-  setEntityProfile: (id: string) => void;
-  setVaultName: (s: string) => void;
-  setVaultEmoji: (s: string) => void;
-  toggleSubVault: (id: string) => void;
-  setRootBudget: (s: string) => void;
-  setBudgetPeriod: (p: 'daily' | 'weekly' | 'monthly') => void;
-  // New simple wizard setters
   setWizardMode: (m: WizardMode) => void;
   setWizardVaultName: (s: string) => void;
   setGoal: (g: GoalKey | null) => void;
@@ -92,9 +62,7 @@ interface OnboardingContextType extends OnboardingState {
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
 const STORAGE_COMPLETED = 'onboarding-completed';
-const STORAGE_DISMISSED = 'onboarding-dismissed';
 const STORAGE_WIZARD    = 'wizard-progress';
-export const MAX_STEPS = 5;
 
 // ─── Local defaults ───────────────────────────────────────────────────────────
 
@@ -145,21 +113,8 @@ function normalizeStoredRecipients(value: unknown): RecipientEntry[] {
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated]           = useState(false);
-  const [step, setStep]                   = useState(0);
-  const [visible, setVisible]             = useState(false);
   const [completed, setCompleted]         = useState(false);
-  const [dismissed, setDismissed]         = useState(false);
 
-  // Legacy fields
-  const [entityType, setEntityTypeState]       = useState<EntityType | null>(null);
-  const [entityProfile, setEntityProfileState] = useState<string | null>(null);
-  const [vaultName, setVaultNameState]         = useState('');
-  const [vaultEmoji, setVaultEmojiState]       = useState('💰');
-  const [selectedSubVaults, setSelectedSubVaults] = useState<string[]>([]);
-  const [rootBudget, setRootBudgetState]       = useState('1');
-  const [budgetPeriod, setBudgetPeriodState]   = useState<'daily' | 'weekly' | 'monthly'>('monthly');
-
-  // New wizard fields
   const [wizardMode, setWizardModeState]           = useState<WizardMode>(WIZARD_DEFAULTS.wizardMode);
   const [wizardVaultName, setWizardVaultNameState] = useState<string>(WIZARD_DEFAULTS.wizardVaultName);
   const [goal, setGoalState]                       = useState<GoalKey | null>(WIZARD_DEFAULTS.goal);
@@ -175,9 +130,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     const isCompleted = localStorage.getItem(STORAGE_COMPLETED) === 'true';
-    const isDismissed = localStorage.getItem(STORAGE_DISMISSED) === 'true';
     setCompleted(isCompleted);
-    setDismissed(isDismissed);
 
     // Restore wizard progress
     const saved = loadWizardProgress();
@@ -207,55 +160,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     } catch { /* ignore */ }
   }, [wizardVaultName, goal, recipientNetwork, baseToken, luksoToken, recipients, maxPerTx, frequency, wizardMode, executor, safetyLevel, agentEnabled, hydrated]);
 
-  const open = useCallback(() => {
-    setVisible(true);
-    setDismissed(false);
-  }, []);
-
-  const close = useCallback(() => setVisible(false), []);
-
-  const next = useCallback(() => {
-    setStep((s) => Math.min(s + 1, MAX_STEPS - 1));
-  }, []);
-
-  const back = useCallback(() => {
-    setStep((s) => Math.max(s - 1, 0));
-  }, []);
-
   const finish = useCallback(() => {
     setCompleted(true);
-    setVisible(false);
     localStorage.setItem(STORAGE_COMPLETED, 'true');
     // Clear wizard progress after success
     try { localStorage.removeItem(STORAGE_WIZARD); } catch { /* ignore */ }
   }, []);
 
-  const dismissPermanently = useCallback(() => {
-    setDismissed(true);
-    setVisible(false);
-    localStorage.setItem(STORAGE_DISMISSED, 'true');
-  }, []);
-
-  const setEntityType = useCallback((t: EntityType) => {
-    setEntityTypeState(t);
-    setEntityProfileState(null);
-    setSelectedSubVaults([]);
-    setVaultNameState('');
-    setVaultEmojiState('💰');
-  }, []);
-
-  const setEntityProfile = useCallback((id: string) => setEntityProfileState(id), []);
-  const toggleSubVault = useCallback((id: string) => {
-    setSelectedSubVaults((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  }, []);
-  const setVaultName    = useCallback((s: string) => setVaultNameState(s), []);
-  const setVaultEmoji   = useCallback((s: string) => setVaultEmojiState(s), []);
-  const setRootBudget   = useCallback((s: string) => setRootBudgetState(s), []);
-  const setBudgetPeriod = useCallback((p: 'daily' | 'weekly' | 'monthly') => setBudgetPeriodState(p), []);
-
-  // New wizard setters
   const setWizardMode       = useCallback((m: WizardMode) => setWizardModeState(m), []);
   const setWizardVaultName  = useCallback((s: string) => setWizardVaultNameState(s), []);
   const setGoal             = useCallback((g: GoalKey | null) => setGoalState(g), []);
@@ -281,14 +192,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   return (
     <OnboardingContext.Provider
       value={{
-        step, visible: hydrated && visible, completed, dismissed,
-        entityType, entityProfile, vaultName, vaultEmoji,
-        selectedSubVaults, rootBudget, budgetPeriod,
+        completed,
         wizardMode, wizardVaultName, goal, recipientNetwork, baseToken, luksoToken, recipients, maxPerTx, frequency,
         agentEnabled, executor, safetyLevel,
-        open, close, next, back, finish, dismissPermanently,
-        setEntityType, setEntityProfile, setVaultName, setVaultEmoji,
-        toggleSubVault, setRootBudget, setBudgetPeriod,
+        finish,
         setWizardMode, setWizardVaultName, setGoal, setRecipientNetwork, setBaseToken, setLuksoToken, addRecipient, removeRecipient,
         setMaxPerTx, setFrequency, setAgentEnabled, setExecutor, setSafetyLevel,
       }}

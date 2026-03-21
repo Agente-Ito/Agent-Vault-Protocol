@@ -97,6 +97,7 @@ export function SimpleSetupFlow() {
   const [deploying, setDeploying] = useState(false);
   const [goalsExpanded, setGoalsExpanded] = useState(false);
   const [customTokenOpen, setCustomTokenOpen] = useState(false);
+  const [myAgentAddress, setMyAgentAddress] = useState('');
 
   useEffect(() => {
     setWizardMode('simple');
@@ -126,7 +127,7 @@ export function SimpleSetupFlow() {
       duplicate_address: 'wizard.limits.error.duplicate_address',
       missing_recipients: 'wizard.limits.error.missing_recipients',
       manual_executor_invalid: 'wizard.automation.error.manual_hidden',
-      my_agent_requires_expert: 'wizard.automation.error.my_agent_requires_expert',
+      my_agent_missing_address: 'wizard.automation.error.my_agent_missing_address',
       base_requires_expert: 'wizard.automation.error.base_requires_expert',
     };
     const key = translations[errorCode];
@@ -175,8 +176,9 @@ export function SimpleSetupFlow() {
       return;
     }
 
-    if (step === 3 && agentEnabled && executor === 'my_agent') {
-      setStepError(translateSimpleError('my_agent_requires_expert'));
+    if (step === 3 && agentEnabled && executor === 'my_agent' &&
+        (!myAgentAddress.trim() || !ethers.isAddress(myAgentAddress.trim()))) {
+      setStepError(translateSimpleError('my_agent_missing_address'));
       return;
     }
 
@@ -206,7 +208,7 @@ export function SimpleSetupFlow() {
     }
 
     if (!isConnected) {
-      setDeployError(t('onboarding.connect_wallet'));
+      setDeployError(t('wizard.review.connect_wallet_required'));
       return;
     }
 
@@ -241,7 +243,7 @@ export function SimpleSetupFlow() {
         await tx.wait();
       } else {
         if (!isRegistryConfigured || !registry || !signer) {
-          setDeployError(t('onboarding.connect_wallet'));
+          setDeployError(t('wizard.review.connect_wallet_required'));
           return;
         }
         await deployRegistryVault({
@@ -256,6 +258,7 @@ export function SimpleSetupFlow() {
             executor,
             safetyLevel,
             luksoToken,
+            myAgentAddress,
           }),
         });
       }
@@ -638,7 +641,35 @@ export function SimpleSetupFlow() {
             {step === 3 && (
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(260px,0.9fr)]">
                 <div className="space-y-5">
-                  {/* Toggle */}
+
+                  {/* Base: automation coming soon card */}
+                  {recipientNetwork === 'base' ? (
+                    <div className="space-y-4">
+                      <div
+                        className="rounded-2xl px-5 py-5 space-y-2"
+                        style={{ background: 'rgba(60,242,255,0.05)', border: '1px solid rgba(60,242,255,0.2)' }}
+                      >
+                        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                          {t('wizard.automation.base_hint_title')}
+                        </p>
+                        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                          {t('wizard.automation.base_hint_desc')}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRecipientNetwork('up');
+                            setStep(2);
+                          }}
+                          className="text-xs font-semibold mt-1"
+                          style={{ color: 'var(--accent)' }}
+                        >
+                          {t('wizard.automation.base_try_lukso')}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                  <>{/* Toggle */}
                   <label
                     className="flex items-center gap-3 cursor-pointer rounded-2xl px-4 py-4"
                     style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
@@ -704,20 +735,33 @@ export function SimpleSetupFlow() {
                                   ? t('wizard.automation.executor.vaultia_desc')
                                   : t('wizard.automation.executor.my_agent_desc')}
                               </p>
-                              {/* My Agent: info box when selected */}
+                              {/* My Agent: inline address form when selected */}
                               {option === 'my_agent' && isSelected && (
                                 <div
-                                  className="mt-3 rounded-xl px-3 py-3 text-xs"
-                                  style={{ background: 'rgba(255,200,87,0.1)', border: '1px solid rgba(255,200,87,0.3)', color: 'var(--warning)' }}
+                                  className="mt-3 space-y-2"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  {t('wizard.automation.my_agent_expert_notice')}
+                                  <label className="block text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                                    {t('wizard.automation.my_agent_address_label')}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={myAgentAddress}
+                                    onChange={(e) => setMyAgentAddress(e.target.value)}
+                                    placeholder={t('wizard.automation.my_agent_address_placeholder')}
+                                    className="w-full rounded-xl px-3 py-2 text-xs font-mono focus:outline-none"
+                                    style={{ background: 'var(--card-mid)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                                  />
+                                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                                    {t('wizard.automation.my_agent_address_hint')}
+                                  </p>
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); handleContinueToExpert(); }}
-                                    className="mt-2 block underline font-semibold"
-                                    style={{ color: 'var(--warning)' }}
+                                    className="text-xs transition-opacity hover:opacity-100"
+                                    style={{ color: 'var(--text-muted)' }}
                                   >
-                                    {t('wizard.automation.my_agent_expert_cta')}
+                                    {t('wizard.automation.my_agent_pro_cta')}
                                   </button>
                                 </div>
                               )}
@@ -746,6 +790,7 @@ export function SimpleSetupFlow() {
                       </p>
                     </div>
                   )}
+                  </>)}
 
                   {stepError && (
                     <p className="text-sm" style={{ color: 'var(--blocked)' }}>{stepError}</p>
@@ -766,6 +811,7 @@ export function SimpleSetupFlow() {
                       agentEnabled={agentEnabled}
                       executor={executor}
                       safetyLevel={safetyLevel}
+                      agentAddress={myAgentAddress}
                     />
                   </div>
                 </div>
@@ -802,6 +848,7 @@ export function SimpleSetupFlow() {
                     agentEnabled={agentEnabled}
                     executor={executor}
                     safetyLevel={safetyLevel}
+                    agentAddress={myAgentAddress}
                   />
 
                   {!isConnected && (
@@ -823,7 +870,7 @@ export function SimpleSetupFlow() {
 
                   {recipientNetwork !== 'base' && !isRegistryConfigured && isConnected && (
                     <Alert variant="warning">
-                      <AlertDescription>{t('onboarding.registry_not_configured')}</AlertDescription>
+                      <AlertDescription>{t('wizard.review.registry_not_configured')}</AlertDescription>
                     </Alert>
                   )}
 
@@ -859,16 +906,16 @@ export function SimpleSetupFlow() {
               onClick={handleBack}
               disabled={deploying}
             >
-              {step === 0 ? t('wizard.btn.exit') : t('onboarding.btn.back')}
+              {step === 0 ? t('wizard.btn.exit') : t('wizard.btn.back')}
             </Button>
 
             {!isLastStep ? (
               <Button size="sm" onClick={handleNext}>
-                {t('onboarding.btn.next')}
+                {t('wizard.btn.next')}
               </Button>
             ) : (
               <Button size="sm" variant="success" onClick={handleDeploy} disabled={!canDeploy}>
-                {deploying ? t('onboarding.btn.deploying') : t('wizard.review.cta')}
+                {deploying ? t('wizard.btn.deploying') : t('wizard.review.cta')}
               </Button>
             )}
           </div>

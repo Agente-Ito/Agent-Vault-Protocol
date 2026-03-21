@@ -125,7 +125,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
   const pathname = usePathname();
   const { isAdvanced } = useMode();
   const { t } = useI18n();
-  const { completed, dismissed, setWizardMode } = useOnboarding();
+  const { completed, setWizardMode } = useOnboarding();
   const { isDemo, enableDemo, disableDemo } = useDemo();
 
   const isActive = (href: string) =>
@@ -236,7 +236,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               onClose();
             }}
             className="w-full flex items-center gap-2 text-xs transition-colors"
-            style={{ color: completed || dismissed ? 'var(--text-muted)' : 'var(--warning)' }}
+            style={{ color: completed ? 'var(--text-muted)' : 'var(--warning)' }}
           >
             <span>{completed ? '◎' : '⚡'}</span>
             <span>{t(completed ? 'nav.setup_reopen' : 'nav.setup_cta')}</span>

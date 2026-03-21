@@ -83,32 +83,42 @@ function Step1TypeSelect({
         {MISSION_TYPES.map((type) => {
           const preset = MISSION_PRESETS[type];
           const isSelected = selected === type;
+          const isComingSoon = !!preset.comingSoon;
           return (
             <button
               key={type}
-              onClick={() => onSelect(type)}
+              onClick={isComingSoon ? undefined : () => onSelect(type)}
+              disabled={isComingSoon}
+              aria-disabled={isComingSoon}
               className={cn(
                 'text-left rounded-xl border-2 p-4 transition-all space-y-2',
-                isSelected
-                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                  : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600 bg-white dark:bg-neutral-800'
+                isComingSoon
+                  ? 'opacity-60 cursor-default border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800'
+                  : isSelected
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                    : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600 bg-white dark:bg-neutral-800'
               )}
             >
               <div className="flex items-center justify-between">
                 <span className="text-2xl">{preset.emoji}</span>
                 <div className="flex items-center gap-1">
-                  {!preset.stable && (
+                  {isComingSoon && (
+                    <Badge variant="warning" className="text-xs">Coming soon</Badge>
+                  )}
+                  {!preset.stable && !isComingSoon && (
                     <Badge variant="neutral" className="text-xs">Beta</Badge>
                   )}
-                  <Badge
-                    variant={
-                      preset.riskLevel === 'high' ? 'danger' :
-                      preset.riskLevel === 'medium' ? 'warning' : 'success'
-                    }
-                    className="text-xs"
-                  >
-                    {preset.riskLevel} risk
-                  </Badge>
+                  {!isComingSoon && (
+                    <Badge
+                      variant={
+                        preset.riskLevel === 'high' ? 'danger' :
+                        preset.riskLevel === 'medium' ? 'warning' : 'success'
+                      }
+                      className="text-xs"
+                    >
+                      {preset.riskLevel} risk
+                    </Badge>
+                  )}
                 </div>
               </div>
               <div>

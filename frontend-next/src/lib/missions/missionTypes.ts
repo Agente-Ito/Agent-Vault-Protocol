@@ -47,6 +47,8 @@ export interface MissionPreset {
   defaultRules: MissionDefaultRules;
   /** Whether this preset is fully demo-ready for hackathon (others are "Beta") */
   stable: boolean;
+  /** Whether this preset is coming soon (disabled, not selectable) */
+  comingSoon?: boolean;
 }
 
 // ─── LSP6 Permission bits (from AgentMode in LSP6KeyLib.sol) ─────────────────
@@ -145,6 +147,7 @@ export const MISSION_PRESETS: Record<MissionType, MissionPreset> = {
       showLiquidReserve: true,
     },
     stable: true,
+    comingSoon: true,
   },
 
   PAYROLL: {

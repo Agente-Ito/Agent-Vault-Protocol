@@ -100,7 +100,7 @@ function VaultPanel({
           </div>
           <SpendBar spent={totalSpent} total={budget} />
           <p className="text-xs text-neutral-400 mt-1">
-            {t(`onboarding.step3.period.${period}` as Parameters<typeof t>[0])}
+            {t(`wizard.limits.freq.${period}` as Parameters<typeof t>[0])}
           </p>
         </div>
 
@@ -260,7 +260,7 @@ function RulesPanel({
                         : 'border-neutral-200 text-neutral-600 hover:border-primary-300 dark:border-neutral-700 dark:text-neutral-400'
                     )}
                   >
-                    {t(`onboarding.step3.period.${p}` as Parameters<typeof t>[0])}
+                    {t(`wizard.limits.freq.${p}` as Parameters<typeof t>[0])}
                   </button>
                 ))}
               </div>

@@ -566,6 +566,13 @@ export default function CreateVaultPage() {
             ))}
           </div>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('create.chain.hint')}</p>
+
+          {chain === 'base' && (
+            <Alert variant="info">
+              <AlertTitle>{t('create.base.automation_note_title')}</AlertTitle>
+              <AlertDescription>{t('create.base.automation_note_desc')}</AlertDescription>
+            </Alert>
+          )}
         </div>
       )}
 
@@ -876,6 +883,19 @@ export default function CreateVaultPage() {
                   </AlertDescription>
                 </Alert>
 
+                <div
+                  className="rounded-xl px-4 py-3 text-xs leading-relaxed"
+                  style={{
+                    background: chain === 'lukso' ? 'rgba(34,255,178,0.07)' : 'rgba(60,242,255,0.05)',
+                    border: chain === 'lukso' ? '1px solid rgba(34,255,178,0.2)' : '1px solid rgba(60,242,255,0.2)',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  {chain === 'lukso'
+                    ? t('create.agents.lukso_automation_note')
+                    : t('create.agents.base_automation_note')}
+                </div>
+
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <FieldLabel>{t('create.field.agents')}</FieldLabel>
@@ -973,11 +993,11 @@ export default function CreateVaultPage() {
                   <Button type="button" variant="secondary" onClick={() => setStep(3)}>{t('create.btn.back')}</Button>
                   <div className="flex gap-2">
                     {agents.trim() === '' && (
-                      <Button type="submit" variant="secondary" disabled={loading || !isConnected || !isRegistryConfigured}>
+                      <Button type="submit" variant="secondary" disabled={loading || !isConnected || (chain === 'lukso' ? !isRegistryConfigured : !isBaseFactoryConfigured())}>
                         {loading ? t('create.btn.deploying') : t('create.btn.skip_deploy')}
                       </Button>
                     )}
-                    <Button type="submit" variant="primary" disabled={loading || !isConnected || !isRegistryConfigured}>
+                    <Button type="submit" variant="primary" disabled={loading || !isConnected || (chain === 'lukso' ? !isRegistryConfigured : !isBaseFactoryConfigured())}>
                       {loading ? t('create.btn.deploying') : t('create.btn.deploy')}
                     </Button>
                   </div>

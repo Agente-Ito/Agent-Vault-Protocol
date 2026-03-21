@@ -125,7 +125,7 @@ export function useMissionActions(): UseMissionActionsResult {
       passphrase: string,
       signer: ethers.Signer
     ): Promise<MissionRecord | null> => {
-      setState({ creating: true, revoking: false, error: null });
+      setState((s) => ({ ...s, creating: true, revoking: false, error: null }));
       try {
         // 1. Generate controller keypair
         const { address: controllerAddress, privateKey } = generateControllerKey();
@@ -178,11 +178,11 @@ export function useMissionActions(): UseMissionActionsResult {
         };
         await saveMission(record);
 
-        setState({ creating: false, revoking: false, error: null });
+        setState((s) => ({ ...s, creating: false, revoking: false, error: null }));
         return record;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        setState({ creating: false, revoking: false, error: msg });
+        setState((s) => ({ ...s, creating: false, revoking: false, error: msg }));
         return null;
       }
     },

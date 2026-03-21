@@ -98,19 +98,27 @@ const GOAL_DOTS: Record<GoalKey, number> = {
 function GoalCard({
   goalKey,
   selected,
+  comingSoon = false,
   onSelect,
 }: {
   goalKey: GoalKey;
   selected: boolean;
+  comingSoon?: boolean;
   onSelect: () => void;
 }) {
   const { t } = useI18n();
   return (
     <button
-      onClick={onSelect}
+      onClick={comingSoon ? undefined : onSelect}
+      disabled={comingSoon}
+      aria-disabled={comingSoon}
       className={cn(
         'relative text-left rounded-2xl px-4 py-4 transition-all duration-200 focus:outline-none group',
-        selected ? 'ring-2' : 'opacity-70 hover:opacity-90'
+        comingSoon
+          ? 'cursor-default opacity-70'
+          : selected
+            ? 'ring-2'
+            : 'opacity-70 hover:opacity-90'
       )}
       style={{
         background: selected
@@ -121,18 +129,27 @@ function GoalCard({
       }}
     >
       <ConstellationIcon count={GOAL_DOTS[goalKey]} />
-      <p className="text-sm font-semibold mt-2" style={{ color: 'var(--text)' }}>
+      <p className="text-sm font-semibold mt-2" style={{ color: comingSoon ? 'var(--text-muted)' : 'var(--text)' }}>
         {t(`wizard.goal.${goalKey}` as Parameters<typeof t>[0])}
       </p>
       <p className="text-xs mt-0.5 leading-snug" style={{ color: 'var(--text-muted)' }}>
         {t(`wizard.goal.${goalKey}_desc` as Parameters<typeof t>[0])}
       </p>
-      {selected && (
+      {selected && !comingSoon && (
         <span
           className="absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white"
           style={{ background: 'var(--accent)', color: '#000' }}
         >
           ✓
+        </span>
+      )}
+
+      {comingSoon && (
+        <span
+          className="absolute top-3 right-3 text-xs px-2 py-0.5 rounded-full font-semibold"
+          style={{ background: 'rgba(255,200,87,0.15)', color: 'var(--warning)', border: '1px solid rgba(255,200,87,0.3)' }}
+        >
+          {t('wizard.goal.coming_soon')}
         </span>
       )}
     </button>
@@ -239,7 +256,8 @@ export default function LandingPage() {
             <GoalCard
               key={g}
               goalKey={g}
-              selected={selectedGoal === g}
+              selected={g === 'save_funds' ? false : selectedGoal === g}
+              comingSoon={g === 'save_funds'}
               onSelect={() => setSelectedGoal((prev) => (prev === g ? null : g))}
             />
           ))}

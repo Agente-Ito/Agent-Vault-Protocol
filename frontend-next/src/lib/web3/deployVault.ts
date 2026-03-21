@@ -67,6 +67,8 @@ export interface SimpleWizardDeployInput {
   safetyLevel: SimpleSafetyLevel;
   /** Custom LSP7 token address. Empty string = native LYX (ZeroAddress). */
   luksoToken?: string;
+  /** Address of the user's own agent (executor === 'my_agent'). Empty = no agent registered. */
+  myAgentAddress?: string;
 }
 
 interface ValidateSimpleWizardOptions {
@@ -160,10 +162,6 @@ export function validateSimpleWizardInput(
     errors.push('manual_executor_invalid');
   }
 
-  if (options.strictExecutorSetup && input.agentEnabled && input.executor === 'my_agent') {
-    errors.push('my_agent_requires_expert');
-  }
-
   return [...new Set(errors)];
 }
 
@@ -206,6 +204,9 @@ export function buildSimpleWizardDeployParams(input: SimpleWizardDeployInput): R
   const advanced = input.safetyLevel === 'advanced';
   const agentMode = advanced ? AgentMode.CUSTOM : SIMPLE_GOAL_MODE[goal];
   const manualExecution = !input.agentEnabled || input.executor === 'me';
+  const agentAddr = input.executor === 'my_agent' && input.myAgentAddress?.trim() && ethers.isAddress(input.myAgentAddress.trim())
+    ? [ethers.getAddress(input.myAgentAddress.trim())]
+    : [];
   const merchants = input.recipients
     .filter((recipient) => !validateRecipient(recipient.address))
     .map((recipient) => normalizeRecipient(recipient.address));
@@ -222,6 +223,7 @@ export function buildSimpleWizardDeployParams(input: SimpleWizardDeployInput): R
     agentMode,
     allowSuperPermissions: advanced && !manualExecution,
     customAgentPermissions: advanced && !manualExecution ? PERM_POWER_USER : ethers.ZeroHash,
+    agents: agentAddr,
   });
 }
 

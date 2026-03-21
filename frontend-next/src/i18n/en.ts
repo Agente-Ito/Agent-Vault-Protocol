@@ -331,6 +331,31 @@ const en = {
   'agents.admin.state_view_only': 'Public / read-only view',
   'agents.admin.unknown': 'Unknown',
 
+  // Tooltips
+  'agents.tooltip.role': 'Named permission group (e.g. PAYMENT_AGENT). Defines what actions this agent can take.',
+  'agents.tooltip.capabilities': 'Fine-grained permissions like CAN_PAY, CAN_TRADE, CAN_REBALANCE. Multiple capabilities can be assigned to one role.',
+  'agents.tooltip.automation': 'Allows scheduled tasks (e.g. recurring payments) to run automatically without manual approval.',
+  'agents.tooltip.max_gas': 'Maximum gas units per on-chain call. Caps computation cost. Set to 0 for no limit (typical for EOA agents).',
+  'agents.tooltip.eoa': 'Externally owned account — a wallet controlled by a private key.',
+  'agents.tooltip.contract': 'A smart contract acting as an autonomous on-chain agent.',
+
+  // Drawer
+  'agents.drawer.title': 'Agent details',
+  'agents.drawer.address': 'Address',
+  'agents.drawer.roles': 'Roles',
+  'agents.drawer.no_roles': 'No roles assigned.',
+  'agents.drawer.automation': 'Automation',
+  'agents.drawer.max_gas': 'Max gas / call',
+  'agents.drawer.assign_role': 'Assign role',
+  'agents.drawer.role_name': 'Role name',
+  'agents.drawer.capabilities_label': 'Capabilities',
+  'agents.drawer.capabilities_hint': 'comma-separated, optional',
+  'agents.drawer.assign_btn': 'Assign role on-chain',
+  'agents.drawer.assigning': 'Assigning…',
+  'agents.drawer.close': 'Close',
+  'agents.drawer.enabled': 'Enabled',
+  'agents.drawer.disabled': 'Disabled',
+
   // ─── Automation ────────────────────────────────────────────────────────────
   'automation.title': 'Automation',
   'automation.subtitle_tasks': 'task(s)',

@@ -333,6 +333,31 @@ const es: Record<LocaleKey, string> = {
   'agents.admin.state_view_only': 'Vista pública / solo lectura',
   'agents.admin.unknown': 'Desconocido',
 
+  // Tooltips
+  'agents.tooltip.role': 'Grupo de permisos con nombre (p.ej. PAYMENT_AGENT). Define qué acciones puede realizar este agente.',
+  'agents.tooltip.capabilities': 'Permisos granulares como CAN_PAY, CAN_TRADE, CAN_REBALANCE. Se pueden asignar varias capacidades a un rol.',
+  'agents.tooltip.automation': 'Permite que tareas programadas (p.ej. pagos recurrentes) se ejecuten automáticamente sin aprobación manual.',
+  'agents.tooltip.max_gas': 'Unidades máximas de gas por llamada on-chain. Limita el costo de cómputo. Pon 0 para sin límite (típico en agentes EOA).',
+  'agents.tooltip.eoa': 'Cuenta de propiedad externa — una billetera controlada por una clave privada.',
+  'agents.tooltip.contract': 'Un contrato inteligente que actúa como agente autónomo on-chain.',
+
+  // Drawer
+  'agents.drawer.title': 'Detalles del agente',
+  'agents.drawer.address': 'Dirección',
+  'agents.drawer.roles': 'Roles',
+  'agents.drawer.no_roles': 'Sin roles asignados.',
+  'agents.drawer.automation': 'Automatización',
+  'agents.drawer.max_gas': 'Gas máx. / llamada',
+  'agents.drawer.assign_role': 'Asignar rol',
+  'agents.drawer.role_name': 'Nombre del rol',
+  'agents.drawer.capabilities_label': 'Capacidades',
+  'agents.drawer.capabilities_hint': 'separadas por coma, opcional',
+  'agents.drawer.assign_btn': 'Asignar rol on-chain',
+  'agents.drawer.assigning': 'Asignando…',
+  'agents.drawer.close': 'Cerrar',
+  'agents.drawer.enabled': 'Habilitada',
+  'agents.drawer.disabled': 'Deshabilitada',
+
   // ─── Automation ────────────────────────────────────────────────────────────
   'automation.title': 'Automatización',
   'automation.subtitle_tasks': 'tarea(s)',

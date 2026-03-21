@@ -28,6 +28,8 @@ export type CoordinatorContract = Contract & {
   registerAgent(agent: string, maxGasPerCall: number, allowedAutomation: boolean): Promise<ContractTransactionResponse>;
   getAgentRoles(agent: string): Promise<string[]>;
   isAgentRegistered(agent: string): Promise<boolean>;
+  getAgentConfig(agent: string): Promise<[boolean, bigint, boolean]>;
+  roleAdmin(): Promise<string>;
 };
 
 export type SchedulerContract = Contract & {

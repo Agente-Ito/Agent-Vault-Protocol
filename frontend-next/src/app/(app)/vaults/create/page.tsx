@@ -10,6 +10,7 @@ import { createPublicClient, custom } from 'viem';
 import { Alert, AlertTitle, AlertDescription } from '@/components/common/Alert';
 import { Button } from '@/components/common/Button';
 import { ProfilePicker } from '@/components/profiles/ProfilePicker';
+import { useAgents } from '@/hooks/useAgents';
 import { useWeb3 } from '@/context/Web3Context';
 import { useI18n } from '@/context/I18nContext';
 import { cn } from '@/lib/utils/cn';
@@ -163,6 +164,8 @@ function VaultPreview({
     '0': t('create.field.period.daily'),
     '1': t('create.field.period.weekly'),
     '2': t('create.field.period.monthly'),
+    '3': t('create.field.period.hourly'),
+    '4': t('create.field.period.five_minutes'),
   };
 
   return (
@@ -255,6 +258,90 @@ function SecurityMode({
       <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{label}</p>
       <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{desc}</p>
     </button>
+  );
+}
+
+// ─── CoordinatorAgentCatalog ─────────────────────────────────────────────────
+// Shows on-chain registered agents (from AgentCoordinator) as selectable cards
+// in the vault creation flow. Renders nothing when coordinator is not configured.
+
+function CoordinatorAgentCatalog({
+  selectedAddresses,
+  onToggle,
+}: {
+  selectedAddresses: string[];
+  onToggle: (address: string) => void;
+}) {
+  const { data: catalogAgents = [], isLoading } = useAgents();
+
+  if (isLoading) {
+    return (
+      <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
+        Loading agent catalog…
+      </p>
+    );
+  }
+
+  if (catalogAgents.length === 0) return null;
+
+  return (
+    <div className="mb-3 space-y-2">
+      <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+        From coordinator catalog — click to select:
+      </p>
+      <div className="grid grid-cols-1 gap-2">
+        {catalogAgents.map((ag) => {
+          const selected = selectedAddresses.some(
+            (a) => a.toLowerCase() === ag.address.toLowerCase()
+          );
+          return (
+            <button
+              key={ag.address}
+              type="button"
+              onClick={() => onToggle(ag.address)}
+              className="flex items-center gap-3 rounded-lg border px-3 py-2 text-left text-xs transition-all"
+              style={{
+                borderColor: selected ? 'var(--accent)' : 'var(--border)',
+                background: selected ? 'rgba(34,255,178,0.07)' : 'var(--bg)',
+                color: 'var(--text)',
+              }}
+            >
+              {/* Checkbox */}
+              <span
+                className="w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center text-xs"
+                style={{
+                  borderColor: selected ? 'var(--accent)' : 'var(--border)',
+                  background: selected ? 'var(--accent)' : 'transparent',
+                  color: 'var(--bg)',
+                }}
+              >
+                {selected && '✓'}
+              </span>
+
+              <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
+                {ag.address.slice(0, 10)}…{ag.address.slice(-6)}
+              </span>
+
+              {ag.roles.map((r) => (
+                <span
+                  key={r}
+                  className="rounded-full px-2 py-0.5"
+                  style={{ background: 'var(--card-mid)', color: 'var(--text-muted)' }}
+                >
+                  {r}
+                </span>
+              ))}
+
+              {ag.allowedAutomation && (
+                <span className="ml-auto rounded-full px-2 py-0.5 text-xs" style={{ background: 'rgba(34,255,178,0.15)', color: 'var(--accent)' }}>
+                  auto
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -704,6 +791,8 @@ export default function CreateVaultPage() {
                     <option value="0">{t('create.field.period.daily')}</option>
                     <option value="1">{t('create.field.period.weekly')}</option>
                     <option value="2">{t('create.field.period.monthly')}</option>
+                    <option value="3">{t('create.field.period.hourly')}</option>
+                    <option value="4">{t('create.field.period.five_minutes')}</option>
                   </select>
                 </div>
               </div>
@@ -908,6 +997,30 @@ export default function CreateVaultPage() {
                       <span>◉</span> {t('picker.browse')}
                     </button>
                   </div>
+
+                  {/* ── Coordinator catalog (if configured) ───────────────── */}
+                  <CoordinatorAgentCatalog
+                    selectedAddresses={rawAgentList}
+                    onToggle={(addr) => {
+                      setAgents((prev) => {
+                        const list = prev.split(',').map((a) => a.trim()).filter(Boolean);
+                        const idx = list.findIndex((a) => a.toLowerCase() === addr.toLowerCase());
+                        if (idx >= 0) {
+                          list.splice(idx, 1);
+                        } else {
+                          list.push(addr);
+                        }
+                        return list.join(', ');
+                      });
+                      setAgentBudgetMap({});
+                    }}
+                  />
+
+                  {/* Curated agents note */}
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    {t('add_agent.catalog_future_note')}
+                  </p>
+
                   <input
                     className={inputClass}
                     style={inputStyle}

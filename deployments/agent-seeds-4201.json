@@ -1,0 +1,43 @@
+{
+  "network": "luksoTestnet",
+  "chainId": 4201,
+  "coordinatorAddress": "0x80586CdB331fF827467CBcf0C5Da0B73B3f3446a",
+  "seededAt": 1774062601,
+  "agents": [
+    {
+      "name": "Recurring Payments Agent",
+      "address": "0x89A3592Fcc15937E72F642495CDF0941E10F867C",
+      "privateKey": "0x1c8325c115b7deb55497e88c218fd7d8a4833967433f4fbdc938e0e666befdaa",
+      "role": "PAYMENT_AGENT",
+      "capabilities": [
+        "CAN_PAY",
+        "CAN_TRANSFER"
+      ],
+      "allowedAutomation": true,
+      "maxGasPerCall": 0
+    },
+    {
+      "name": "Subscriptions Agent",
+      "address": "0x016922fDD2E04FC302049C4d29784b5126892f71",
+      "privateKey": "0x609a7829b0ff74cf803bfbfe24fc226daae0a4c36a4a1f3aef63036de1f5b11b",
+      "role": "SUBSCRIPTION_AGENT",
+      "capabilities": [
+        "CAN_SUBSCRIBE"
+      ],
+      "allowedAutomation": true,
+      "maxGasPerCall": 0
+    },
+    {
+      "name": "Treasury Agent",
+      "address": "0x340C94f91FFE195dC86dA7176efa740EDf59F81c",
+      "privateKey": "0x938bde784c7e587f23d53660cb4cd85401c445b54379f34edf4d3d430f8b1140",
+      "role": "TREASURY_AGENT",
+      "capabilities": [
+        "CAN_REBALANCE",
+        "CAN_TRANSFER"
+      ],
+      "allowedAutomation": false,
+      "maxGasPerCall": 500000
+    }
+  ]
+}

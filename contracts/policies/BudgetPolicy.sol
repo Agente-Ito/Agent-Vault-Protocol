@@ -14,7 +14,7 @@ interface IPolicyEngineSimulation {
 ///         FIX #18: onlyPolicyEngine — msg.sender in validate() is PolicyEngine (not AgentSafe).
 ///         Call chain: AgentSafe → PolicyEngine → BudgetPolicy
 contract BudgetPolicy is IPolicy, Ownable {
-    enum Period { DAILY, WEEKLY, MONTHLY }
+    enum Period { DAILY, WEEKLY, MONTHLY, HOURLY, FIVE_MINUTES }
 
     /// @dev FIX #18: only the registered PolicyEngine can call validate()
     address public immutable policyEngine;
@@ -44,7 +44,7 @@ contract BudgetPolicy is IPolicy, Ownable {
         address _budgetToken
     ) {
         require(_budget > 0, "BP: budget must be > 0");
-        require(uint8(_period) <= 2, "BP: invalid period");
+        require(uint8(_period) <= 4, "BP: invalid period");
         _transferOwnership(initialOwner);
         policyEngine = _policyEngine;
         budget       = _budget;
@@ -94,15 +94,17 @@ contract BudgetPolicy is IPolicy, Ownable {
     }
 
     /// @notice Returns the duration in seconds for the current budget period.
-    /// @dev DAILY=86400s, WEEKLY=604800s, MONTHLY=2592000s (fixed 30 days, not calendar month).
-    ///      UIs should display "30-day period" not "monthly" to avoid calendar confusion.
+    /// @dev DAILY=86400s, WEEKLY=604800s, MONTHLY=2592000s, HOURLY=3600s, FIVE_MINUTES=300s.
+    ///      HOURLY and FIVE_MINUTES are intended for demo/testing purposes.
     function periodDuration() external view returns (uint256) {
         return _periodDuration();
     }
 
     function _periodDuration() internal view returns (uint256) {
-        if (period == Period.DAILY)  return 1 days;
-        if (period == Period.WEEKLY) return 7 days;
-        return 30 days; // MONTHLY: fixed 30-day rolling window (not calendar month)
+        if (period == Period.DAILY)        return 1 days;
+        if (period == Period.WEEKLY)       return 7 days;
+        if (period == Period.MONTHLY)      return 30 days;
+        if (period == Period.HOURLY)       return 1 hours;
+        return 5 minutes; // FIVE_MINUTES — demo/testing only
     }
 }

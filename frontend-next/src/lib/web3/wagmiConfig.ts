@@ -12,7 +12,21 @@ import { createConfig, http } from "wagmi";
 import { base, baseSepolia } from "viem/chains";
 import { luksoTestnet, luksoMainnet } from "./chains";
 
-const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "DEVELOPMENT";
+const walletConnectProjectId =
+  process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim() ?? "";
+
+const hasWalletConnectProjectId =
+  walletConnectProjectId.length > 0 && walletConnectProjectId !== "DEVELOPMENT";
+
+const projectId = hasWalletConnectProjectId
+  ? walletConnectProjectId
+  : "DEVELOPMENT";
+
+const otherWallets = [metaMaskWallet, coinbaseWallet];
+
+if (hasWalletConnectProjectId) {
+  otherWallets.push(rainbowWallet, walletConnectWallet);
+}
 
 const connectors = connectorsForWallets(
   [
@@ -22,7 +36,7 @@ const connectors = connectorsForWallets(
     },
     {
       groupName: "Other Wallets",
-      wallets: [metaMaskWallet, coinbaseWallet, rainbowWallet, walletConnectWallet],
+      wallets: otherWallets,
     },
   ],
   { appName: "AI Financial Operating System", projectId }

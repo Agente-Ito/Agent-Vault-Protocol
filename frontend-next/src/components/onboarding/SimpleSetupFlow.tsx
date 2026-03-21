@@ -779,6 +779,21 @@ export function SimpleSetupFlow() {
                         </p>
                         <SafetyLevelChips value={safetyLevel} onChange={setSafetyLevel} />
                       </div>
+
+                      {/* Curated agents note */}
+                      <div
+                        className="rounded-xl px-4 py-3 text-xs leading-relaxed"
+                        style={{
+                          background: 'rgba(34,255,178,0.06)',
+                          border: '1px solid rgba(34,255,178,0.15)',
+                          color: 'var(--text-muted)',
+                        }}
+                      >
+                        <span className="font-medium" style={{ color: 'var(--success)' }}>
+                          {t('wizard.automation.curated_title')}&nbsp;
+                        </span>
+                        {t('wizard.automation.curated_desc')}
+                      </div>
                     </>
                   ) : (
                     <div className="rounded-2xl px-4 py-4" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>

@@ -49,7 +49,7 @@ export interface CreateMissionInput {
   allowedTargets: string[];
   /** Budget in LYX (converted to wei internally) */
   budgetLYX: number;
-  period: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+  period: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'HOURLY' | 'FIVE_MINUTES';
   /** Expiration unix timestamp, 0 = no expiry */
   expiration?: number;
   /** Optional per-agent budget list (for PAYROLL / GRANTS) */

@@ -19,6 +19,7 @@ interface DeploymentResult {
   deployer: string;
   registryAddress: string;
   merchantRegistryAddress: string;
+  coordinatorAddress: string;
   taskSchedulerAddress: string;
   agentSafeAddress: string;
   keyManagerAddress: string;
@@ -87,8 +88,16 @@ async function main() {
   const taskSchedulerAddr = await taskScheduler.getAddress();
   console.log("✅ TaskScheduler:", taskSchedulerAddr);
 
-  // 6. Deploy AgentVaultRegistry
-  console.log("\n[6/6] Deploying AgentVaultRegistry...");
+  // 6. Deploy AgentCoordinator
+  console.log("\n[6/7] Deploying AgentCoordinator...");
+  const AgentCoordinatorFactory = await ethers.getContractFactory("AgentCoordinator");
+  const coordinator = await AgentCoordinatorFactory.deploy({ nonce: nonce++ });
+  await coordinator.waitForDeployment();
+  const coordinatorAddr = await coordinator.getAddress();
+  console.log("✅ AgentCoordinator:", coordinatorAddr);
+
+  // 7. Deploy AgentVaultRegistry
+  console.log("\n[7/7] Deploying AgentVaultRegistry...");
   const AgentVaultRegistryFactory = await ethers.getContractFactory("AgentVaultRegistry");
   const registry = await AgentVaultRegistryFactory.deploy(coreAddr, vdAddr, kmDeployerAddr, { nonce: nonce++ });
   const registryAddr = await registry.getAddress();
@@ -99,6 +108,11 @@ async function main() {
   console.log("\n📦 Deploying demo vault...");
   const agentWallet = ethers.Wallet.createRandom();
   console.log("🤖 Demo agent address:", agentWallet.address);
+
+  console.log("\n🧾 Registering demo agent in AgentCoordinator...");
+  const registerAgentTx = await coordinator.registerAgent(agentWallet.address, 0, true, { nonce: nonce++ });
+  await registerAgentTx.wait();
+  console.log("✅ Demo agent registered in AgentCoordinator");
 
   const ONE_WEEK_FROM_NOW = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
 
@@ -202,6 +216,7 @@ async function main() {
     deployer: deployer.address,
     registryAddress: registryAddr,
     merchantRegistryAddress: merchantRegistryAddr,
+    coordinatorAddress: coordinatorAddr,
     taskSchedulerAddress: taskSchedulerAddr,
     agentSafeAddress: safeAddr,
     keyManagerAddress: kmAddr,
@@ -222,6 +237,7 @@ async function main() {
   const updates = [
     { key: "REGISTRY_ADDRESS", value: result.registryAddress },
     { key: "MERCHANT_REGISTRY_ADDRESS", value: result.merchantRegistryAddress },
+    { key: "COORDINATOR_ADDRESS", value: result.coordinatorAddress },
     { key: "TASK_SCHEDULER_ADDRESS", value: result.taskSchedulerAddress },
     { key: "AGENT_SAFE_ADDRESS", value: result.agentSafeAddress },
     { key: "KEY_MANAGER_ADDRESS", value: result.keyManagerAddress },
@@ -258,6 +274,7 @@ async function main() {
   console.log(`  Deployer:       https://explorer.testnet.lukso.network/address/${vdAddr}`);
   console.log(`  KMDeployer:     https://explorer.testnet.lukso.network/address/${kmDeployerAddr}`);
   console.log(`  TaskScheduler:  https://explorer.testnet.lukso.network/address/${taskSchedulerAddr}`);
+  console.log(`  Coordinator:    https://explorer.testnet.lukso.network/address/${coordinatorAddr}`);
   console.log(`  Registry:       https://explorer.testnet.lukso.network/address/${registryAddr}`);
   console.log(`  Safe:           https://explorer.testnet.lukso.network/address/${safeAddr}`);
   console.log(`  KeyManager:     https://explorer.testnet.lukso.network/address/${kmAddr}`);

@@ -17,7 +17,7 @@ node -e "const ethers = require('ethers'); const wallet = ethers.Wallet.createRa
 
 ### 2. Get Testnet LYX
 
-Visit the LUKSO faucet: https://faucet.testnet.lukso.network
+Visit the LUKSO faucet: [https://faucet.testnet.lukso.network](https://faucet.testnet.lukso.network)
 
 Paste your address and claim testnet LYX. You'll need at least **5 LYX** for deployment + 50 LYX for vault funding.
 
@@ -30,12 +30,14 @@ cp .env.example .env
 ```
 
 Edit `.env`:
-```
+
+```dotenv
 PRIVATE_KEY=0x... # Your 64-char hex private key (without 0x prefix, it will be handled)
 ```
 
 Optional:
-```
+
+```dotenv
 ETHERSCAN_API_KEY=ABC... # For contract verification
 LUKSO_TESTNET_RPC=...    # Override RPC endpoint
 ```
@@ -61,6 +63,7 @@ npm run deploy:testnet
 ```
 
 The script will:
+
 1. ✅ Validate your account balance
 2. ✅ Deploy `AgentVaultRegistry` (factory)
 3. ✅ Deploy `MerchantRegistry` (optional directory)
@@ -76,7 +79,7 @@ The script will:
 
 ### Example Output
 
-```
+```text
 🔗 Network: luksoTestnet (chainId: 4201)
 📍 Deployer: 0x1234...
 💰 Balance: 100.5 LYX
@@ -130,22 +133,26 @@ The script will:
 ## Understanding the Vault Stack
 
 ### AgentSafe
+
 - **Type**: LSP9Vault
 - **Role**: Execution container for agent payments
 - **Controls**: Validates all payments via PolicyEngine before execution
 - **Access**: Only the linked LSP6KeyManager can call payment functions
 
 ### PolicyEngine
+
 - **Type**: Policy orchestrator
 - **Role**: Runs validation chain for each payment
 - **Policies**: BudgetPolicy (mandatory) + optional MerchantPolicy + ExpirationPolicy
 
 ### LSP6KeyManager
+
 - **Type**: Permission controller (native LUKSO standard)
 - **Role**: Acts as intermediary for all agent transactions
 - **Permissions**: Grants agents SUPER_CALL | SUPER_TRANSFERVALUE (actual restrictions in PolicyEngine)
 
 ### BudgetPolicy
+
 - **Budget**: 100 LYX (configurable)
 - **Period**: Weekly (0=daily, 1=weekly, 2=monthly, 3=yearly)
 - **Behavior**: Resets spend counter at period boundaries
@@ -179,18 +186,23 @@ await tx.wait();
 ## Troubleshooting
 
 ### "Deployer balance is 0"
-→ Fund your testnet account: https://faucet.testnet.lukso.network
+
+→ Fund your testnet account: [https://faucet.testnet.lukso.network](https://faucet.testnet.lukso.network)
 
 ### "PRIVATE_KEY invalid or not set"
+
 → Check `.env` file has `PRIVATE_KEY=0x...` (with proper 64-char hex format)
 
 ### "Transaction reverted: insufficient balance"
+
 → You need more than 5 LYX for deployment + transfer fees
 
 ### "acceptOwnership failed"
+
 → Contracts may already have different owners. Check block explorer.
 
 ### "VaultDeployed event not found"
+
 → Transaction succeeded but event wasn't emitted. Check block explorer for transaction details.
 
 ## Verification (Optional)
@@ -203,9 +215,109 @@ npx hardhat verify --network luksoTestnet <CONTRACT_ADDRESS> <CONSTRUCTOR_ARGS>
 ```
 
 Example:
+
 ```bash
 npx hardhat verify --network luksoTestnet 0x1234... 0x5678 # AgentVaultRegistry
 ```
+
+## Frontend Beta/Demo Deploys (Vercel)
+
+For a hackathon, beta, or internal demo, the frontend can be deployed safely to
+Vercel as long as the required public environment variables are configured.
+
+Current scope:
+
+- LUKSO Testnet only for the LUKSO side
+- Base Sepolia only for the Base side
+- No mainnet contracts are documented or supported in this deployment path yet
+
+### 1. Prepare the frontend environment variables
+
+Use [frontend-next/.env.local.example](frontend-next/.env.local.example) as the
+source of truth for frontend configuration.
+
+Required in Vercel:
+
+```bash
+NEXT_PUBLIC_RPC_URL=https://rpc.testnet.lukso.network
+NEXT_PUBLIC_REGISTRY_ADDRESS=0x...
+NEXT_PUBLIC_BASE_RPC_URL=https://sepolia.base.org
+NEXT_PUBLIC_BASE_CHAIN_ID=84532
+NEXT_PUBLIC_BASE_VAULT_FACTORY_ADDRESS=0x...
+```
+
+Optional in Vercel:
+
+```bash
+NEXT_PUBLIC_COORDINATOR_ADDRESS=0x...
+NEXT_PUBLIC_TASK_SCHEDULER_ADDRESS=0x...
+NEXT_PUBLIC_INDEXER_URL=https://your-indexer.example/v1/graphql
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
+```
+
+Notes:
+
+- `NEXT_PUBLIC_COORDINATOR_ADDRESS` is only needed if the Agents page should be enabled.
+- `NEXT_PUBLIC_TASK_SCHEDULER_ADDRESS` is only needed if automation features are part of the demo.
+- `NEXT_PUBLIC_INDEXER_URL` is optional; when omitted, profile data falls back to direct ERC725.js reads.
+- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is optional; when omitted, the frontend hides WalletConnect and Rainbow wallet options instead of showing broken mobile/QR flows.
+
+### 2. Add the variables in Vercel
+
+In the Vercel project:
+
+1. Open `Settings`.
+2. Open `Environment Variables`.
+3. Add every required `NEXT_PUBLIC_*` variable.
+4. Add optional values only for the features you want visible in the beta/demo.
+5. Apply them to `Preview` and `Production` environments as needed.
+
+Important:
+
+- The frontend build now fails in production when required variables are missing.
+- This is intentional so misconfigured previews or production deploys do not ship a partially broken UI.
+
+### 3. Configure WalletConnect Cloud (free plan)
+
+If QR code and mobile wallet support are needed, create a free WalletConnect Cloud project:
+
+1. Go to [WalletConnect Cloud](https://cloud.walletconnect.com).
+2. Create a project on the free plan.
+3. Copy the generated `Project ID`.
+4. Add it to Vercel as `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`.
+5. Register your allowed domains in WalletConnect Cloud.
+
+Recommended domains to register:
+
+- your production domain
+- your Vercel preview domain pattern if you plan to test previews
+- any custom staging domain used during the hackathon/demo
+
+If you skip this step:
+
+- MetaMask, Coinbase Wallet, and Universal Profiles remain available.
+- Rainbow and WalletConnect are hidden automatically.
+
+### 4. Deploy the frontend
+
+From the `frontend-next/` app:
+
+```bash
+npm install
+npm run build
+```
+
+If the local production build succeeds, connect the repository to Vercel and deploy the `frontend-next` app directory.
+
+### 5. Validate the hosted demo
+
+After deployment, verify:
+
+1. The app loads and the wallet modal opens.
+2. Vault creation works on LUKSO Testnet.
+3. Base flows only appear if `NEXT_PUBLIC_BASE_VAULT_FACTORY_ADDRESS` is configured.
+4. Agents and automation pages only appear when their optional contract addresses are set.
+5. WalletConnect/Rainbow only appear when `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is configured with an allowed domain.
 
 ## Next Steps
 
@@ -216,13 +328,14 @@ npx hardhat verify --network luksoTestnet 0x1234... 0x5678 # AgentVaultRegistry
 
 ## Useful Links
 
-- **LUKSO Testnet Faucet**: https://faucet.testnet.lukso.network
-- **Block Explorer**: https://explorer.testnet.lukso.network
-- **Documentation**: https://docs.lukso.tech
+- **LUKSO Testnet Faucet**: [https://faucet.testnet.lukso.network](https://faucet.testnet.lukso.network)
+- **Block Explorer**: [https://explorer.testnet.lukso.network](https://explorer.testnet.lukso.network)
+- **Documentation**: [https://docs.lukso.tech](https://docs.lukso.tech)
 
 ## Support
 
 For issues or questions:
+
 - Check Hardhat logs: `HARDHAT_LOGGING=true npm run deploy:testnet`
-- Verify on block explorer: https://explorer.testnet.lukso.network
+- Verify on block explorer: [https://explorer.testnet.lukso.network](https://explorer.testnet.lukso.network)
 - Review contract source in `/contracts`

@@ -1,47 +1,66 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/common/Alert';
 import { Button } from '@/components/common/Button';
 import { AgentCard } from '@/components/agents/AgentCard';
 import { AgentRulesDrawer } from '@/components/agents/AgentRulesDrawer';
-import type { AgentRecord } from '@/components/agents/types';
 import { useI18n } from '@/context/I18nContext';
-import { useContacts } from '@/hooks/useContacts';
-
-const MOCK_AGENTS: AgentRecord[] = [
-  { address: '0xABCDEF1234567890ABCDEF1234567890ABCDEF12', name: 'Groceries Bot', roles: ['GROCERY_AGENT'], active: true, perTxLimit: 50, monthlyLimit: 300, spentThisPeriod: 127, vaultCount: 2, maxGasPerCall: 0, allowedAutomation: false, merchantWhitelist: ['Walmart', 'Costco'] },
-  { address: '0x1111111111111111111111111111111111111111', name: 'Rent Bot', roles: ['SUBSCRIPTION_AGENT'], active: false, perTxLimit: 1500, monthlyLimit: 1500, spentThisPeriod: 0, vaultCount: 1, maxGasPerCall: 0, allowedAutomation: true, merchantWhitelist: [] },
-  { address: '0x2222222222222222222222222222222222222222', name: 'DeFi Strategy Bot', roles: ['TRADE_AGENT'], active: true, perTxLimit: 0, monthlyLimit: 1500, spentThisPeriod: 780, vaultCount: 1, maxGasPerCall: 500000, allowedAutomation: true, merchantWhitelist: [] },
-];
-
-type FilterKey = 'all' | 'active' | 'paused';
+import { useWeb3 } from '@/context/Web3Context';
+import { useAgents, useCoordinatorAdmin } from '@/hooks/useAgents';
+import { useRegisterAgent } from '@/hooks/useRegisterAgent';
+import type { AgentRecord } from '@/components/agents/types';
 
 export default function AgentsPage() {
-  const [agents, setAgents]           = useState<AgentRecord[]>(MOCK_AGENTS);
-  const [filter, setFilter]           = useState<FilterKey>('all');
-  const [editingAgent, setEditingAgent] = useState<AgentRecord | null>(null);
   const { t } = useI18n();
-  const { findContact } = useContacts();
+  const { account, isConnected, isCoordinatorConfigured } = useWeb3();
+  const { data: agents = [], isLoading, error } = useAgents();
+  const { data: roleAdmin, isLoading: isRoleAdminLoading } = useCoordinatorAdmin();
+  const registerAgent = useRegisterAgent();
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [newAgentAddress, setNewAgentAddress] = useState('');
+  const [maxGasPerCall, setMaxGasPerCall] = useState('0');
+  const [allowedAutomation, setAllowedAutomation] = useState(true);
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [drawerAgent, setDrawerAgent] = useState<AgentRecord | null>(null);
 
-  const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
-    { key: 'all',    label: t('agents.filter.all')    },
-    { key: 'active', label: t('agents.filter.active') },
-    { key: 'paused', label: t('agents.filter.paused') },
-  ];
+  const isRoleAdmin = useMemo(() => {
+    if (!account || !roleAdmin) {
+      return false;
+    }
 
-  const filtered = agents.filter((a) => {
-    if (filter === 'active') return a.active;
-    if (filter === 'paused') return !a.active;
-    return true;
-  });
+    return account.toLowerCase() === roleAdmin.toLowerCase();
+  }, [account, roleAdmin]);
 
-  const handleToggle = (address: string) => {
-    setAgents((prev) => prev.map((a) => (a.address === address ? { ...a, active: !a.active } : a)));
-  };
+  const canRegisterAgents = isCoordinatorConfigured && isConnected && isRoleAdmin;
 
-  const handleSave = (updated: AgentRecord) => {
-    setAgents((prev) => prev.map((a) => (a.address === updated.address ? updated : a)));
+  const adminStateLabel = !isCoordinatorConfigured
+    ? t('agents.admin.state_not_configured')
+    : isRoleAdminLoading
+      ? t('agents.admin.state_checking')
+      : canRegisterAgents
+        ? t('agents.admin.state_admin')
+        : t('agents.admin.state_view_only');
+
+  const handleRegisterAgent = async () => {
+    setSubmitMessage(null);
+
+    try {
+      await registerAgent.mutateAsync({
+        agent: newAgentAddress.trim(),
+        maxGasPerCall: Number(maxGasPerCall || '0'),
+        allowedAutomation,
+      });
+
+      setSubmitMessage(t('agents.register.success'));
+      setNewAgentAddress('');
+      setMaxGasPerCall('0');
+      setAllowedAutomation(true);
+      setShowRegisterForm(false);
+    } catch (err) {
+      setSubmitMessage(err instanceof Error ? err.message : t('agents.register.error'));
+    }
   };
 
   return (
@@ -50,60 +69,133 @@ export default function AgentsPage() {
         <div>
           <h1 className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{t('agents.title')}</h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-            {agents.length} {t('agents.list.count')}
+            {isCoordinatorConfigured ? `${agents.length} ${t('agents.list.count')}` : t('agents.manage_subtitle')}
           </p>
         </div>
-        <Button size="sm">{t('agents.add')}</Button>
+        <Button
+          size="sm"
+          onClick={() => setShowRegisterForm((current) => !current)}
+          disabled={!canRegisterAgents}
+          title={!canRegisterAgents ? adminStateLabel : undefined}
+        >
+          {showRegisterForm ? t('agents.register.cancel') : t('agents.add')}
+        </Button>
       </div>
 
-      <div className="flex items-center gap-2">
-        {FILTER_OPTIONS.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key)}
-            className="px-3 py-1.5 rounded-full text-sm font-medium transition-opacity"
-            style={{
-              background: filter === key ? 'var(--primary)' : 'var(--card-mid)',
-              color:      filter === key ? '#fff'           : 'var(--text-muted)',
-              border:     filter === key ? '1px solid transparent' : '1px solid var(--border)',
-            }}
-          >
-            {label}
-          </button>
-        ))}
-        <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>
-          {filtered.length} {t('agents.results')}
-        </span>
-      </div>
+      {!isCoordinatorConfigured && (
+        <Alert variant="warning">
+          <AlertTitle>{t('agents.not_configured.title')}</AlertTitle>
+          <AlertDescription>{t('agents.not_configured.desc')}</AlertDescription>
+        </Alert>
+      )}
 
-      {filtered.length === 0 ? (
+      <Alert variant="info">
+        <AlertTitle>{t('agents.beta.title')}</AlertTitle>
+        <AlertDescription>{t('agents.beta.desc')}</AlertDescription>
+      </Alert>
+
+      <Alert variant={canRegisterAgents ? 'success' : 'info'}>
+        <AlertTitle>{t('agents.admin.title')}</AlertTitle>
+        <AlertDescription>
+          <p>{t('agents.admin.desc')}</p>
+          <p className="mt-2 text-xs font-mono">
+            {t('agents.admin.role_admin')}: {roleAdmin ?? t('agents.admin.unknown')}
+          </p>
+          <p className="mt-1 text-xs">
+            {t('agents.admin.current_state')}: {adminStateLabel}
+          </p>
+        </AlertDescription>
+      </Alert>
+
+      {showRegisterForm && canRegisterAgents && (
+        <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-5 space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{t('agents.register.title')}</h2>
+            <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>{t('agents.register.desc')}</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium" style={{ color: 'var(--text)' }}>{t('agents.register.address_label')}</label>
+            <input
+              type="text"
+              value={newAgentAddress}
+              onChange={(event) => setNewAgentAddress(event.target.value)}
+              placeholder={t('agents.register.address_placeholder')}
+              className="w-full h-10 rounded-md border border-neutral-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-neutral-50"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium" style={{ color: 'var(--text)' }}>{t('agents.register.max_gas_label')}</label>
+            <input
+              type="number"
+              min="0"
+              value={maxGasPerCall}
+              onChange={(event) => setMaxGasPerCall(event.target.value)}
+              placeholder="0"
+              className="w-full h-10 rounded-md border border-neutral-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-neutral-600 dark:bg-neutral-700 dark:text-neutral-50"
+            />
+          </div>
+
+          <label className="flex items-center gap-3 text-sm" style={{ color: 'var(--text)' }}>
+            <input
+              type="checkbox"
+              checked={allowedAutomation}
+              onChange={(event) => setAllowedAutomation(event.target.checked)}
+            />
+            <span>{t('agents.register.allow_automation')}</span>
+          </label>
+
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setShowRegisterForm(false)}>
+              {t('agents.register.cancel')}
+            </Button>
+            <Button onClick={handleRegisterAgent} disabled={registerAgent.isPending}>
+              {registerAgent.isPending ? t('agents.register.btn_loading') : t('agents.register.btn')}
+            </Button>
+          </div>
+
+          {submitMessage && (
+            <Alert variant={registerAgent.isError ? 'error' : 'success'}>
+              <AlertDescription>{submitMessage}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <Alert variant="error">
+          <AlertTitle>Unable to load agents</AlertTitle>
+          <AlertDescription>{String(error)}</AlertDescription>
+        </Alert>
+      )}
+
+      {isCoordinatorConfigured && isLoading ? (
+        <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+          {t('agents.loading')}
+        </div>
+      ) : isCoordinatorConfigured && agents.length === 0 ? (
         <div className="text-center py-16 space-y-2">
           <p className="text-3xl">🤖</p>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('agents.list.empty')}</p>
         </div>
-      ) : (
+      ) : isCoordinatorConfigured ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((agent) => {
-            const contact = findContact(agent.address);
-            return (
-              <AgentCard
-                key={agent.address}
-                agent={agent}
-                contactName={contact?.name}
-                contactAvatarUrl={contact?.avatarUrl}
-                onEdit={() => setEditingAgent(agent)}
-                onToggle={() => handleToggle(agent.address)}
-              />
-            );
-          })}
+          {agents.map((agent) => (
+            <AgentCard
+              key={agent.address}
+              agent={agent}
+              onClick={() => setDrawerAgent(agent)}
+            />
+          ))}
         </div>
-      )}
+      ) : null}
 
       <AgentRulesDrawer
-        agent={editingAgent}
-        open={editingAgent !== null}
-        onClose={() => setEditingAgent(null)}
-        onSave={handleSave}
+        agent={drawerAgent}
+        open={drawerAgent !== null}
+        onClose={() => setDrawerAgent(null)}
+        isRoleAdmin={isRoleAdmin}
       />
     </div>
   );

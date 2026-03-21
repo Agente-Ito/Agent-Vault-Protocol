@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils/cn';
 
 type NavItem = { href: string; labelKey: string; icon: string };
 
+const AGENTS_ENABLED = !!process.env.NEXT_PUBLIC_COORDINATOR_ADDRESS;
+
 const CORE_ITEMS: NavItem[] = [
   { href: '/dashboard',  labelKey: 'nav.dashboard',       icon: '◈' },
   { href: '/vaults',     labelKey: 'nav.spaces',           icon: '✦' },
@@ -185,7 +187,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
           {isAdvanced && (
             <>
               <SectionDivider label={t('nav.section.pro')} />
-              {PRO_ITEMS.map((item) => (
+              {PRO_ITEMS.filter((item) => AGENTS_ENABLED || item.href !== '/agents').map((item) => (
                 <NavLink
                   key={item.href}
                   item={item}

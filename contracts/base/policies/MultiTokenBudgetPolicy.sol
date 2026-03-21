@@ -24,7 +24,7 @@ interface IPolicyEngineSimulation {
 ///         transactions don't push the next reset forward by their delay.
 contract MultiTokenBudgetPolicy is IPolicy, Ownable {
 
-    enum Period { DAILY, WEEKLY, MONTHLY }
+    enum Period { DAILY, WEEKLY, MONTHLY, HOURLY, FIVE_MINUTES }
 
     struct TokenBudget {
         uint256 limit;          // maximum spend per period (token decimals)
@@ -98,7 +98,7 @@ contract MultiTokenBudgetPolicy is IPolicy, Ownable {
     /// @param period Reset frequency
     function setBudget(address token, uint256 limit, Period period) external onlyOwner {
         require(limit > 0, "MTBP: limit must be > 0");
-        require(uint8(period) <= 2, "MTBP: invalid period");
+        require(uint8(period) <= 4, "MTBP: invalid period");
 
         TokenBudget storage b = tokenBudgets[token];
         if (!b.configured) {
@@ -151,8 +151,10 @@ contract MultiTokenBudgetPolicy is IPolicy, Ownable {
     }
 
     function _periodDuration(Period p) internal pure returns (uint256) {
-        if (p == Period.DAILY)  return 1 days;
-        if (p == Period.WEEKLY) return 7 days;
-        return 30 days; // MONTHLY: fixed 30-day rolling window
+        if (p == Period.DAILY)        return 1 days;
+        if (p == Period.WEEKLY)       return 7 days;
+        if (p == Period.MONTHLY)      return 30 days;
+        if (p == Period.HOURLY)       return 1 hours;
+        return 5 minutes; // FIVE_MINUTES — demo/testing only
     }
 }

@@ -21,7 +21,7 @@ const ANY_STANDARD_ID = 'ffffffff';
 const ANY_FUNCTION_SIG = 'ffffffff';
 const ALLOWED_CALL_TYPE_CALL_AND_VALUE = 3;
 
-export type DeployPeriodKey = 'daily' | 'weekly' | 'monthly';
+export type DeployPeriodKey = 'daily' | 'weekly' | 'monthly' | 'hourly' | 'five-minutes';
 export type SimpleWizardGoal =
   | 'pay_people'
   | 'pay_vendors'
@@ -81,6 +81,8 @@ export const PERIOD_MAP: Record<DeployPeriodKey, number> = {
   daily: 0,
   weekly: 1,
   monthly: 2,
+  hourly: 3,
+  'five-minutes': 4,
 };
 
 export function parseBudgetToWei(value: string, fallback = '0'): bigint {

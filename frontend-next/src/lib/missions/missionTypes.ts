@@ -15,7 +15,7 @@ export const MISSION_TYPES = [
 
 export type MissionType = typeof MISSION_TYPES[number];
 
-export type Period = 'DAILY' | 'WEEKLY' | 'MONTHLY';
+export type Period = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'HOURLY' | 'FIVE_MINUTES';
 
 export interface MissionDefaultRules {
   period: Period;

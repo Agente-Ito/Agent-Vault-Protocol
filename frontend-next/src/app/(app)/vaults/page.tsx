@@ -14,6 +14,8 @@ import { isBaseFactoryConfigured } from '@/lib/web3/baseContracts';
 import { Skeleton, SkeletonCard } from '@/components/common/Skeleton';
 import { Alert, AlertDescription } from '@/components/common/Alert';
 import { useI18n } from '@/context/I18nContext';
+import { AddAgentModal, VaultRef } from '@/components/agents/AddAgentModal';
+import { ethers } from 'ethers';
 
 // ─── Spend bar ────────────────────────────────────────────────────────────────
 
@@ -38,7 +40,15 @@ function SpendBar({ spent, total }: { spent: number; total: number }) {
 
 // ─── Vault card ───────────────────────────────────────────────────────────────
 
-function VaultCard({ vault }: { vault: { safe: string; keyManager: string; policyEngine: string; label: string } }) {
+function VaultCard({
+  vault,
+  signer,
+  onAddAgent,
+}: {
+  vault: { safe: string; keyManager: string; policyEngine: string; label: string };
+  signer: ethers.Signer | null;
+  onAddAgent: (ref: VaultRef) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const { detail, loading } = useVault(expanded ? vault.safe : null);
   const { t } = useI18n();
@@ -119,6 +129,24 @@ function VaultCard({ vault }: { vault: { safe: string; keyManager: string; polic
                 <AlertDescription>{detail.policySummary.warnings.join(' ')}</AlertDescription>
               </Alert>
             )}
+            {signer && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-sm font-sans"
+                onClick={() =>
+                  onAddAgent({
+                    chain: 'lukso',
+                    vaultSafe: vault.safe,
+                    keyManager: vault.keyManager,
+                    label: vault.label,
+                    signer,
+                  })
+                }
+              >
+                {t('vaults.card.manage_agents')}
+              </Button>
+            )}
           </div>
         )}
       </CardContent>
@@ -128,7 +156,13 @@ function VaultCard({ vault }: { vault: { safe: string; keyManager: string; polic
 
 // ─── Base vault card ──────────────────────────────────────────────────────────
 
-function BaseVaultCard({ vault }: { vault: BaseVaultSummary }) {
+function BaseVaultCard({
+  vault,
+  onAddAgent,
+}: {
+  vault: BaseVaultSummary;
+  onAddAgent: (ref: VaultRef) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const { t } = useI18n();
   const short = (addr: string) => `${addr.slice(0, 8)}…${addr.slice(-6)}`;
@@ -170,6 +204,20 @@ function BaseVaultCard({ vault }: { vault: BaseVaultSummary }) {
           >
             <p><span className="font-sans font-medium">{t('vaults.card.policy_engine')}:</span> {short(vault.policyEngine)}</p>
             <p><span className="font-sans font-medium">Vault:</span> {vault.vault}</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-sm font-sans"
+              onClick={() =>
+                onAddAgent({
+                  chain: 'base',
+                  vaultAddress: vault.vault,
+                  label: vault.label,
+                })
+              }
+            >
+              {t('vaults.card.manage_agents')}
+            </Button>
           </div>
         )}
       </CardContent>
@@ -180,10 +228,11 @@ function BaseVaultCard({ vault }: { vault: BaseVaultSummary }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function VaultsPage() {
-  const { registry, account, isConnected } = useWeb3();
+  const { registry, account, isConnected, signer } = useWeb3();
   const { vaults, loading, error, refresh: refreshVaults } = useVaults(registry, account);
   const { vaults: baseVaults, loading: baseLoading, error: baseError, refresh: refreshBase } = useBaseVaults(account);
   const { t } = useI18n();
+  const [agentModalVault, setAgentModalVault] = useState<VaultRef | null>(null);
 
   const handleRefreshAll = () => { refreshVaults(); refreshBase(); };
 
@@ -257,7 +306,14 @@ export default function VaultsPage() {
 
       {vaults.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-          {vaults.map((vault) => <VaultCard key={vault.safe} vault={vault} />)}
+          {vaults.map((vault) => (
+            <VaultCard
+              key={vault.safe}
+              vault={vault}
+              signer={signer}
+              onAddAgent={setAgentModalVault}
+            />
+          ))}
         </div>
       )}
 
@@ -288,11 +344,24 @@ export default function VaultsPage() {
           )}
           {baseVaults.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-              {baseVaults.map((vault) => <BaseVaultCard key={vault.vault} vault={vault} />)}
+              {baseVaults.map((vault) => (
+                <BaseVaultCard
+                  key={vault.vault}
+                  vault={vault}
+                  onAddAgent={setAgentModalVault}
+                />
+              ))}
             </div>
           )}
         </div>
       )}
+
+      <AddAgentModal
+        vault={agentModalVault}
+        open={agentModalVault !== null}
+        onClose={() => setAgentModalVault(null)}
+        onSuccess={() => { handleRefreshAll(); setAgentModalVault(null); }}
+      />
     </div>
   );
 }

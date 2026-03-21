@@ -25,12 +25,14 @@ const ACTION_TYPES = [
   { id: 'recurring-purchase' as ActionType, emoji: '🛒', title: 'Compra recurrente', desc: 'Pago periódico a un merchant específico' },
 ];
 
-type Frequency = 'daily' | 'weekly' | 'monthly' | 'custom-blocks';
+type Frequency = 'five-minutes' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'custom-blocks';
 
 const FREQUENCIES = [
-  { value: 'daily' as Frequency, label: 'Cada día', seconds: 86400 },
-  { value: 'weekly' as Frequency, label: 'Cada semana', seconds: 604800 },
-  { value: 'monthly' as Frequency, label: 'Cada mes', seconds: 2592000 },
+  { value: 'five-minutes' as Frequency, label: 'Cada 5 minutos (demo)', seconds: 300 },
+  { value: 'hourly'       as Frequency, label: 'Cada hora (demo)',       seconds: 3600 },
+  { value: 'daily'        as Frequency, label: 'Cada día',               seconds: 86400 },
+  { value: 'weekly'       as Frequency, label: 'Cada semana',            seconds: 604800 },
+  { value: 'monthly'      as Frequency, label: 'Cada mes',               seconds: 2592000 },
 ];
 
 const TOTAL_STEPS = 3;

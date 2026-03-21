@@ -155,7 +155,7 @@ interface MissionConfig {
   vaultSafe: string;
   allowedTargets: string;
   budgetLYX: number;
-  period: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+  period: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'HOURLY' | 'FIVE_MINUTES';
 }
 
 function Step2Config({
@@ -268,6 +268,8 @@ function Step2Config({
             <option value="DAILY">{t('missions.create.period.daily')}</option>
             <option value="WEEKLY">{t('missions.create.period.weekly')}</option>
             <option value="MONTHLY">{t('missions.create.period.monthly')}</option>
+            <option value="HOURLY">{t('missions.create.period.hourly')}</option>
+            <option value="FIVE_MINUTES">{t('missions.create.period.five_minutes')}</option>
           </select>
         </div>
       </div>

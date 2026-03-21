@@ -112,6 +112,13 @@ const config: HardhatUserConfig = {
       chainId: 31337,
       allowUnlimitedContractSize: true,
       loggingEnabled: process.env.HARDHAT_LOGGING === "true",
+      // Tests share mutable account balances across files. Many beforeEach hooks
+      // send 100-200 ETH to fund vaults, so the default 10,000 ETH drains across
+      // the full suite. 1,000,000 ETH ensures no test ever runs out of funds.
+      accounts: {
+        count: 20,
+        accountsBalance: "1000000000000000000000000",
+      },
     },
   },
 

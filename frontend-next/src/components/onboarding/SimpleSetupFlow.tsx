@@ -26,7 +26,15 @@ import { buildSimpleWizardDeployParams, deployRegistryVault, validateSimpleWizar
 
 const TOTAL_STEPS = 5;
 
-const SIMPLE_FREQS: FrequencyKey[] = ['daily', 'weekly', 'monthly'];
+const SIMPLE_FREQS: FrequencyKey[] = ['daily', 'weekly', 'monthly', 'hourly', 'five-minutes'];
+
+const FREQ_I18N: Record<FrequencyKey, string> = {
+  daily: 'wizard.limits.freq.daily',
+  weekly: 'wizard.limits.freq.weekly',
+  monthly: 'wizard.limits.freq.monthly',
+  hourly: 'wizard.limits.freq.hourly',
+  'five-minutes': 'wizard.limits.freq.five_minutes',
+};
 const SIMPLE_EXECUTORS: ExecutorType[] = ['vaultia', 'my_agent'];
 
 // Primary preset goals always visible
@@ -490,6 +498,16 @@ export function SimpleSetupFlow() {
                     </button>
                     {customTokenOpen && (
                       <div className="mt-2 space-y-1">
+                        {process.env.NEXT_PUBLIC_LUKSO_DEMO_TOKEN_ADDRESS && (
+                          <button
+                            type="button"
+                            onClick={() => setLuksoToken(process.env.NEXT_PUBLIC_LUKSO_DEMO_TOKEN_ADDRESS!)}
+                            className="text-xs px-3 py-1.5 rounded-lg transition-opacity hover:opacity-80"
+                            style={{ background: 'var(--card-mid)', border: '1px solid var(--primary)', color: 'var(--primary)' }}
+                          >
+                            AVT — Demo Token (testnet)
+                          </button>
+                        )}
                         <input
                           type="text"
                           value={luksoToken}
@@ -553,7 +571,7 @@ export function SimpleSetupFlow() {
                       <label className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
                         {t('wizard.limits.frequency')}
                       </label>
-                      <div className="grid gap-2 sm:grid-cols-3">
+                      <div className="grid gap-2 grid-cols-2 sm:grid-cols-5">
                         {SIMPLE_FREQS.map((period) => (
                           <button
                             key={period}
@@ -566,7 +584,7 @@ export function SimpleSetupFlow() {
                               color: frequency === period ? 'var(--text)' : 'var(--text-muted)',
                             }}
                           >
-                            {t(`wizard.limits.freq.${period}` as Parameters<typeof t>[0])}
+                            {t(FREQ_I18N[period] as Parameters<typeof t>[0])}
                           </button>
                         ))}
                       </div>

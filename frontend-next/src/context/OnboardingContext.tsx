@@ -16,7 +16,7 @@ export type GoalKey =
 export type SafetyLevel = 'safe' | 'flexible' | 'advanced';
 export type ExecutorType = 'me' | 'vaultia' | 'my_agent';
 export type WizardMode = 'simple' | 'expert';
-export type FrequencyKey = 'daily' | 'weekly' | 'monthly';
+export type FrequencyKey = 'daily' | 'weekly' | 'monthly' | 'hourly' | 'five-minutes';
 export type RecipientNetwork = 'up' | 'base';
 
 export interface RecipientEntry {

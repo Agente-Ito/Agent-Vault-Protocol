@@ -63,6 +63,12 @@ interface IAgentBudgetPolicy {
 ///                  Cross-chain indexing via chainId field in VaultDeployed event.
 contract AgentVaultRegistry is Ownable {
 
+    /// @dev Minimum gas required for a full vault deployment (7-8 contract creations).
+    /// Measured empirically: ~3.2M gas worst-case. 4M provides a 25% safety margin.
+    uint256 private constant MINIMUM_DEPLOYMENT_GAS = 4_000_000;
+
+    error InsufficientGasForDeployment(uint256 available, uint256 required);
+
     AgentVaultDeployerCore public immutable core;
     AgentVaultDeployer     public immutable deployer;
     AgentKMDeployer        public immutable kmDeployer;
@@ -320,6 +326,10 @@ contract AgentVaultRegistry is Ownable {
         private
         returns (VaultRecord memory record)
     {
+        if (gasleft() < MINIMUM_DEPLOYMENT_GAS) {
+            revert InsufficientGasForDeployment(gasleft(), MINIMUM_DEPLOYMENT_GAS);
+        }
+
         // 1. Deploy AgentSafe — factory is temp owner
         IAgentSafe safe = IAgentSafe(core.newSafe(address(this)));
 

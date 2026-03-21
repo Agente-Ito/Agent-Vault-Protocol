@@ -180,6 +180,14 @@ const en = {
   'vaults.card.whitelisted': 'whitelisted',
   'vaults.card.no_restriction': 'no restriction',
   'vaults.card.manage_agents': '+ Manage Agents',
+  'vaults.card.get_demo_tokens': 'Get 1000 AVT demo tokens',
+  'vaults.card.demo_tokens_success': '1000 AVT minted to vault ✓',
+  'vaults.card.fund_faucet': 'Get LYXt for gas →',
+  'vaults.no_extension.title': 'Get started with LUKSO',
+  'vaults.no_extension.install_ext': 'Install UP Extension (Chrome)',
+  'vaults.no_extension.create_profile': 'Create a Universal Profile',
+  'vaults.no_extension.faucet': 'Get testnet LYXt (for gas)',
+  'vaults.has_extension.connect_prompt': 'UP Extension detected — connect your profile to continue.',
   'vaults.stats.total': 'Total Vaults',
   'vaults.stats.active': 'Active',
   'vaults.stats.network': 'Network',
@@ -701,6 +709,8 @@ const en = {
   'wizard.limits.freq.daily': 'Daily',
   'wizard.limits.freq.weekly': 'Weekly',
   'wizard.limits.freq.monthly': 'Monthly',
+  'wizard.limits.freq.hourly': 'Hourly (demo)',
+  'wizard.limits.freq.five_minutes': 'Every 5 min (demo)',
   'wizard.limits.cta': 'Save and continue',
 
   // Step 3 — Automation

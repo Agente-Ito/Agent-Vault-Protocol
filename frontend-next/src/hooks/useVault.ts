@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 import { useWeb3 } from '@/context/Web3Context';
 import { getProvider } from '@/lib/web3/provider';
-import { getSafeContract, getPolicyEngineContract, getBudgetPolicyContract, getMerchantPolicyContract, getExpirationPolicyContract, getAgentBudgetPolicyContract } from '@/lib/web3/contracts';
+import { getSafeContract, getPolicyEngineContract, getBudgetPolicyContract, getMerchantPolicyContract, getExpirationPolicyContract, getAgentBudgetPolicyContract, getLSP7DemoTokenContract } from '@/lib/web3/contracts';
 
 export interface VaultPolicySummary {
   budget?: string;
@@ -16,6 +16,11 @@ export interface VaultPolicySummary {
     periodDurationLabel: string;
     timeUntilReset: string;
   };
+  budgetPolicyAddress?: string;
+  merchantPolicyAddress?: string;
+  expirationPolicyAddress?: string;
+  budgetToken?: string;       // address(0) = native LYX
+  tokenBalance?: string;      // LSP7 balance if budgetToken != address(0)
 }
 
 export interface VaultDetail {
@@ -78,10 +83,22 @@ export function useVault(safeAddress: string | null) {
 
           try {
             const bp = getBudgetPolicyContract(p, provider);
-            const [budget, spent, periodStart] = await Promise.all([bp.budget(), bp.spent(), bp.periodStart()]);
+            const [budget, spent, periodStart, budgetToken] = await Promise.all([
+              bp.budget(), bp.spent(), bp.periodStart(), bp.budgetToken(),
+            ]);
             summary.budget = ethers.formatEther(budget);
             summary.spent = ethers.formatEther(spent);
             summary.periodStart = new Date(Number(periodStart) * 1000).toLocaleString();
+            summary.budgetPolicyAddress = p;
+            summary.budgetToken = budgetToken;
+            if (budgetToken !== ethers.ZeroAddress) {
+              try {
+                const tokenBal = await getLSP7DemoTokenContract(budgetToken, provider).balanceOf(safeAddress);
+                summary.tokenBalance = ethers.formatEther(tokenBal);
+              } catch {
+                // token balance read failed — leave undefined
+              }
+            }
             matchedPolicy = true;
             continue;
           } catch {
@@ -91,6 +108,7 @@ export function useVault(safeAddress: string | null) {
           try {
             const mp = getMerchantPolicyContract(p, provider);
             summary.merchants = await mp.getMerchants();
+            summary.merchantPolicyAddress = p;
             matchedPolicy = true;
             continue;
           } catch {
@@ -100,6 +118,7 @@ export function useVault(safeAddress: string | null) {
           try {
             const ep = getExpirationPolicyContract(p, provider);
             summary.expiration = (await ep.expiration()).toString();
+            summary.expirationPolicyAddress = p;
             matchedPolicy = true;
             continue;
           } catch {
@@ -118,6 +137,8 @@ export function useVault(safeAddress: string | null) {
               durationSec === 86400 ? 'Daily' :
               durationSec === 604800 ? 'Weekly' :
               durationSec === 2592000 ? 'Monthly' :
+              durationSec === 3600 ? 'Hourly' :
+              durationSec === 300 ? '5 min' :
               `${durationSec}s`;
             const resetSec = Number(timeUntilReset);
             const timeUntilResetLabel = resetSec === 0 ? 'resetting now' :

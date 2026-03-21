@@ -27,6 +27,7 @@ contract PolicyEngine is Ownable, ReentrancyGuard {
 
     event PolicyAdded(address indexed policy);
     event PolicyRemoved(uint256 indexed index, address indexed policy);
+    event PoliciesSwapped(uint256 indexed indexA, uint256 indexed indexB);
     /// @dev FIX #14: includes token so indexers can distinguish LYX vs LSP7 payments
     event Validated(address indexed agent, address indexed token, address indexed to, uint256 amount);
     /// @dev Emitted when a policy blocks an execution during validate()
@@ -80,30 +81,29 @@ contract PolicyEngine is Ownable, ReentrancyGuard {
         emit PolicyAdded(policy);
     }
 
-    /// @notice Remove a policy by index using swap-and-pop.
-    ///
-    /// @dev ⚠️  ORDER HAZARD — swap-and-pop does NOT preserve insertion order.
-    ///
-    ///      After ANY call to removePolicy():
-    ///        • The policy that was last in the array moves to `index`.
-    ///        • getPolicies() will return a different order than addPolicy() sequence.
-    ///        • validate() and simulateExecution() iterate in the new order.
-    ///
-    ///      REQUIREMENTS:
-    ///        • Policies MUST be independent and stateless with respect to each other.
-    ///        • NO policy may read or depend on a previous policy's output.
-    ///        • If you are considering an order-dependent policy, DO NOT add it here;
-    ///          compose the dependency inside a single IPolicy implementation instead.
-    ///
-    ///      Before removing a policy, verify that no currently registered policy
-    ///      assumes a fixed position for any other policy in the chain.
+    /// @notice Remove a policy by index. Preserves insertion order via shift-left.
+    ///         MAX_POLICIES = 20 bounds the loop to O(1) in practice.
     function removePolicy(uint256 index) external onlyOwner {
         require(index < policies.length, "PE: out of bounds");
         address removed = policies[index];
         isPolicy[removed] = false;
-        policies[index] = policies[policies.length - 1];
+        for (uint256 i = index; i < policies.length - 1; ) {
+            policies[i] = policies[i + 1];
+            unchecked { ++i; }
+        }
         policies.pop();
         emit PolicyRemoved(index, removed);
+    }
+
+    /// @notice Swaps two policies in the execution order. Use when you need to
+    ///         explicitly control which policy validates first.
+    function swapPolicies(uint256 indexA, uint256 indexB) external onlyOwner {
+        require(
+            indexA < policies.length && indexB < policies.length,
+            "PE: index out of bounds"
+        );
+        (policies[indexA], policies[indexB]) = (policies[indexB], policies[indexA]);
+        emit PoliciesSwapped(indexA, indexB);
     }
 
     function getPolicies() external view returns (address[] memory) {

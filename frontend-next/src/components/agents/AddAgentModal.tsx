@@ -7,6 +7,7 @@ import { Button } from '@/components/common/Button';
 import { Alert, AlertDescription } from '@/components/common/Alert';
 import { useAgents } from '@/hooks/useAgents';
 import { useAddAgentToVault, AgentMode } from '@/hooks/useAddAgentToVault';
+import { useRemoveAgentFromVault } from '@/hooks/useRemoveAgentFromVault';
 import { useI18n } from '@/context/I18nContext';
 import type { AgentRecord } from './types';
 
@@ -119,18 +120,22 @@ const AGENT_MODES: { key: AgentMode; labelKey: string; descKey: string }[] = [
 export function AddAgentModal({ vault, open, onClose, onSuccess }: AddAgentModalProps) {
   const { t } = useI18n();
   const { adding, success, error, addAgent, reset } = useAddAgentToVault();
+  const { removing, success: removeSuccess, error: removeError, removeAgent, reset: resetRemove } = useRemoveAgentFromVault();
 
   const [agentAddress, setAgentAddress] = useState('');
   const [mode, setMode] = useState<AgentMode>('pay_people');
+  const [removeAddress, setRemoveAddress] = useState('');
 
   // Reset form when vault changes or modal closes
   useEffect(() => {
     if (!open) {
       setAgentAddress('');
       setMode('pay_people');
+      setRemoveAddress('');
       reset();
+      resetRemove();
     }
-  }, [open, reset]);
+  }, [open, reset, resetRemove]);
 
   if (!vault) return null;
 
@@ -270,7 +275,7 @@ export function AddAgentModal({ vault, open, onClose, onSuccess }: AddAgentModal
             </div>
           )}
 
-          {/* Feedback */}
+          {/* Add feedback */}
           {success && (
             <Alert variant="success">
               <AlertDescription>{t('add_agent.success')}</AlertDescription>
@@ -281,6 +286,50 @@ export function AddAgentModal({ vault, open, onClose, onSuccess }: AddAgentModal
               <AlertDescription>{t('add_agent.error')}: {error}</AlertDescription>
             </Alert>
           )}
+
+          {/* Divider */}
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: '8px', paddingTop: '8px' }} />
+
+          {/* Remove agent section */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+              Remove agent
+            </p>
+            <input
+              type="text"
+              value={removeAddress}
+              onChange={(e) => setRemoveAddress(e.target.value)}
+              placeholder="0x… agent address to remove"
+              className="w-full rounded-xl px-3 py-2 text-xs font-mono focus:outline-none"
+              style={{ background: 'var(--card-mid)', border: '1px solid var(--border)', color: 'var(--text)' }}
+            />
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                if (!ethers.isAddress(removeAddress) || !vault) return;
+                let ok: boolean;
+                if (vault.chain === 'lukso') {
+                  ok = await removeAgent({ chain: 'lukso', keyManager: vault.keyManager, agentAddress: removeAddress, signer: vault.signer });
+                } else {
+                  ok = await removeAgent({ chain: 'base', vaultAddress: vault.vaultAddress, agentAddress: removeAddress });
+                }
+                if (ok) onSuccess?.();
+              }}
+              disabled={removing || !ethers.isAddress(removeAddress) || removeSuccess}
+            >
+              {removing ? 'Removing…' : 'Remove agent'}
+            </Button>
+            {removeSuccess && (
+              <Alert variant="success">
+                <AlertDescription>Agent removed successfully.</AlertDescription>
+              </Alert>
+            )}
+            {removeError && (
+              <Alert variant="warning">
+                <AlertDescription>Remove failed: {removeError}</AlertDescription>
+              </Alert>
+            )}
+          </div>
         </SheetBody>
 
         {/* Footer */}

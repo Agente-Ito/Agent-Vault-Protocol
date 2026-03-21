@@ -15,7 +15,9 @@ import { Skeleton, SkeletonCard } from '@/components/common/Skeleton';
 import { Alert, AlertDescription } from '@/components/common/Alert';
 import { useI18n } from '@/context/I18nContext';
 import { AddAgentModal, VaultRef } from '@/components/agents/AddAgentModal';
-import { ethers } from 'ethers';
+import { useManageVaultPolicy } from '@/hooks/useManageVaultPolicy';
+import { useDemoToken } from '@/hooks/useDemoToken';
+import { ethers, parseUnits } from 'ethers';
 
 // ─── Spend bar ────────────────────────────────────────────────────────────────
 
@@ -52,9 +54,48 @@ function VaultCard({
   const [expanded, setExpanded] = useState(false);
   const { detail, loading } = useVault(expanded ? vault.safe : null);
   const { t } = useI18n();
+  const { updating, error: policyError, updateBudget, addMerchants, removeMerchant, updateExpiration } = useManageVaultPolicy();
+  const { minting, success: mintSuccess, error: mintError, demoTokenAddress, mintToVault } = useDemoToken();
+
+  const isDemoToken = !!(
+    demoTokenAddress &&
+    detail?.policySummary.budgetToken &&
+    detail.policySummary.budgetToken.toLowerCase() === demoTokenAddress.toLowerCase()
+  );
+
+  const [newBudget, setNewBudget] = useState('');
+  const [newMerchant, setNewMerchant] = useState('');
+  const [newExpiration, setNewExpiration] = useState('');
+  const [policySuccess, setPolicySuccess] = useState<string | null>(null);
+
   const short = (addr: string) => `${addr.slice(0, 8)}…${addr.slice(-6)}`;
   const spent  = detail ? parseFloat(detail.policySummary.spent ?? '0') : 0;
   const budget = detail?.policySummary.budget ? parseFloat(detail.policySummary.budget) : 0;
+
+  const handleUpdateBudget = async () => {
+    if (!signer || !detail?.policySummary.budgetPolicyAddress || !newBudget) return;
+    const ok = await updateBudget(detail.policySummary.budgetPolicyAddress, ethers.parseEther(newBudget), signer);
+    if (ok) { setPolicySuccess('Budget updated.'); setNewBudget(''); }
+  };
+
+  const handleAddMerchant = async () => {
+    if (!signer || !detail?.policySummary.merchantPolicyAddress || !ethers.isAddress(newMerchant)) return;
+    const ok = await addMerchants(detail.policySummary.merchantPolicyAddress, [newMerchant], signer);
+    if (ok) { setPolicySuccess('Merchant added.'); setNewMerchant(''); }
+  };
+
+  const handleRemoveMerchant = async (addr: string) => {
+    if (!signer || !detail?.policySummary.merchantPolicyAddress) return;
+    const ok = await removeMerchant(detail.policySummary.merchantPolicyAddress, addr, signer);
+    if (ok) setPolicySuccess('Merchant removed.');
+  };
+
+  const handleUpdateExpiration = async () => {
+    if (!signer || !detail?.policySummary.expirationPolicyAddress || !newExpiration) return;
+    const ts = BigInt(Math.floor(new Date(newExpiration).getTime() / 1000));
+    const ok = await updateExpiration(detail.policySummary.expirationPolicyAddress, ts, signer);
+    if (ok) { setPolicySuccess('Expiration updated.'); setNewExpiration(''); }
+  };
 
   return (
     <Card className="flex flex-col">
@@ -83,10 +124,30 @@ function VaultCard({
                 <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
                   {t('vaults.card.balance')}
                 </p>
-                <p className="text-2xl font-bold leading-tight" style={{ color: 'var(--text)' }}>
-                  {detail.balance}
-                  <span className="text-sm font-medium ml-1" style={{ color: 'var(--text-muted)' }}>LYX</span>
-                </p>
+                {detail.policySummary.budgetToken && detail.policySummary.budgetToken !== ethers.ZeroAddress ? (
+                  <p className="text-2xl font-bold leading-tight" style={{ color: 'var(--text)' }}>
+                    {detail.policySummary.tokenBalance ?? '—'}
+                    <span className="text-sm font-medium ml-1" style={{ color: 'var(--text-muted)' }}>AVT</span>
+                  </p>
+                ) : (
+                  <p className="text-2xl font-bold leading-tight" style={{ color: 'var(--text)' }}>
+                    {detail.balance}
+                    <span className="text-sm font-medium ml-1" style={{ color: 'var(--text-muted)' }}>LYX</span>
+                  </p>
+                )}
+                {!detail.policySummary.budgetToken || detail.policySummary.budgetToken === ethers.ZeroAddress ? (
+                  parseFloat(detail.balance) === 0 && (
+                    <a
+                      href="https://faucet.testnet.lukso.network"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs hover:underline"
+                      style={{ color: 'var(--primary)' }}
+                    >
+                      {t('vaults.card.fund_faucet')}
+                    </a>
+                  )
+                ) : null}
               </div>
               {detail.policySummary.expiration && detail.policySummary.expiration !== '0' && (
                 <div className="text-right">
@@ -129,6 +190,21 @@ function VaultCard({
                 <AlertDescription>{detail.policySummary.warnings.join(' ')}</AlertDescription>
               </Alert>
             )}
+            {signer && isDemoToken && (
+              <div className="font-sans pt-xs">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={minting || mintSuccess}
+                  onClick={() => mintToVault(vault.safe, parseUnits('1000', 18), signer)}
+                >
+                  {minting ? '…' : mintSuccess ? t('vaults.card.demo_tokens_success') : t('vaults.card.get_demo_tokens')}
+                </Button>
+                {mintError && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--blocked)' }}>{mintError}</p>
+                )}
+              </div>
+            )}
             {signer && (
               <Button
                 variant="secondary"
@@ -146,6 +222,97 @@ function VaultCard({
               >
                 {t('vaults.card.manage_agents')}
               </Button>
+            )}
+
+            {/* ── Policy management (owner only) ──────────────────────────── */}
+            {signer && (
+              <div className="space-y-sm font-sans pt-xs" style={{ borderTop: '1px solid var(--border)' }}>
+                {/* Budget */}
+                {detail.policySummary.budgetPolicyAddress && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                      Budget limit (LYX)
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        value={newBudget}
+                        onChange={(e) => setNewBudget(e.target.value)}
+                        placeholder="New budget"
+                        className="flex-1 rounded-lg px-2 py-1 text-xs font-mono focus:outline-none"
+                        style={{ background: 'var(--card-mid)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                      />
+                      <Button variant="secondary" size="sm" onClick={handleUpdateBudget} disabled={updating || !newBudget}>
+                        {updating ? '…' : 'Update'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Merchants */}
+                {detail.policySummary.merchantPolicyAddress && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                      Merchants
+                    </p>
+                    {detail.policySummary.merchants?.map((m) => (
+                      <div key={m} className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs truncate">{m}</span>
+                        <button
+                          onClick={() => handleRemoveMerchant(m)}
+                          disabled={updating}
+                          className="text-xs px-2 py-0.5 rounded transition-all"
+                          style={{ background: 'var(--card-mid)', border: '1px solid var(--border)', color: 'var(--blocked)' }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newMerchant}
+                        onChange={(e) => setNewMerchant(e.target.value)}
+                        placeholder="0x… add merchant"
+                        className="flex-1 rounded-lg px-2 py-1 text-xs font-mono focus:outline-none"
+                        style={{ background: 'var(--card-mid)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                      />
+                      <Button variant="secondary" size="sm" onClick={handleAddMerchant} disabled={updating || !ethers.isAddress(newMerchant)}>
+                        {updating ? '…' : 'Add'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Expiration */}
+                {detail.policySummary.expirationPolicyAddress && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                      Expiration
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={newExpiration}
+                        onChange={(e) => setNewExpiration(e.target.value)}
+                        className="flex-1 rounded-lg px-2 py-1 text-xs focus:outline-none"
+                        style={{ background: 'var(--card-mid)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                      />
+                      <Button variant="secondary" size="sm" onClick={handleUpdateExpiration} disabled={updating || !newExpiration}>
+                        {updating ? '…' : 'Update'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Feedback */}
+                {policySuccess && (
+                  <p className="text-xs" style={{ color: 'var(--success)' }}>{policySuccess} ✓</p>
+                )}
+                {policyError && (
+                  <p className="text-xs" style={{ color: 'var(--blocked)' }}>{policyError}</p>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -228,7 +395,7 @@ function BaseVaultCard({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function VaultsPage() {
-  const { registry, account, isConnected, signer } = useWeb3();
+  const { registry, account, isConnected, signer, hasUPExtension } = useWeb3();
   const { vaults, loading, error, refresh: refreshVaults } = useVaults(registry, account);
   const { vaults: baseVaults, loading: baseLoading, error: baseError, refresh: refreshBase } = useBaseVaults(account);
   const { t } = useI18n();
@@ -275,8 +442,46 @@ export default function VaultsPage() {
         </div>
       )}
 
-      {!isConnected && (
-        <Alert variant="info"><AlertDescription>{t('vaults.connect_prompt')}</AlertDescription></Alert>
+      {!isConnected && !hasUPExtension && (
+        <Card>
+          <CardContent className="space-y-sm py-md">
+            <p className="font-semibold" style={{ color: 'var(--text)' }}>{t('vaults.no_extension.title')}</p>
+            <div className="flex flex-col gap-xs">
+              <a
+                href="https://chromewebstore.google.com/detail/universal-profiles/abpickdkkbnbcoepogfhkhennhfhehfn"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm hover:underline"
+                style={{ color: 'var(--primary)' }}
+              >
+                ↗ {t('vaults.no_extension.install_ext')}
+              </a>
+              <a
+                href="https://universalprofile.cloud"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm hover:underline"
+                style={{ color: 'var(--primary)' }}
+              >
+                ↗ {t('vaults.no_extension.create_profile')}
+              </a>
+              <a
+                href="https://faucet.testnet.lukso.network"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm hover:underline"
+                style={{ color: 'var(--primary)' }}
+              >
+                ↗ {t('vaults.no_extension.faucet')}
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {!isConnected && hasUPExtension && (
+        <Alert variant="info">
+          <AlertDescription>{t('vaults.has_extension.connect_prompt')}</AlertDescription>
+        </Alert>
       )}
 
       {isConnected && loading && (

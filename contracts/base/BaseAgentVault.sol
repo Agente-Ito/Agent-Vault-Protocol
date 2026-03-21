@@ -127,6 +127,14 @@ contract BaseAgentVault is IAccount, Ownable, ReentrancyGuard {
 
     // ─── ERC-4337 IAccount ────────────────────────────────────────────────────
 
+    /// @dev Reverts if caller is not the configured EntryPoint.
+    function _requireFromEntryPoint() internal view {
+        require(
+            msg.sender == entryPoint,
+            "BaseAgentVault: caller is not EntryPoint"
+        );
+    }
+
     /// @notice Called by the EntryPoint to validate a UserOperation signed by owner.
     ///         Returns SIG_VALIDATION_SUCCESS (0) if the signature is valid.
     ///         Prefunds the EntryPoint with missing gas funds if needed.
@@ -137,7 +145,7 @@ contract BaseAgentVault is IAccount, Ownable, ReentrancyGuard {
         bytes32 userOpHash,
         uint256 missingAccountFunds
     ) external override returns (uint256 validationData) {
-        require(msg.sender == entryPoint, "BAV: only EntryPoint");
+        _requireFromEntryPoint();
 
         bytes32 msgHash = userOpHash.toEthSignedMessageHash();
         address recovered = msgHash.recover(userOp.signature);

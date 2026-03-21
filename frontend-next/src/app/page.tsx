@@ -7,6 +7,7 @@ import { useWeb3 } from '@/context/Web3Context';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useMode } from '@/context/ModeContext';
 import { useI18n } from '@/context/I18nContext';
+import { useTheme } from '@/context/ThemeContext';
 import { useVaults } from '@/hooks/useVaults';
 import { cn } from '@/lib/utils/cn';
 import { ParticleField } from '@/components/common/ParticleField';
@@ -113,7 +114,8 @@ export default function LandingPage() {
   const { account, isConnected, registry } = useWeb3();
   const { setGoal, setWizardMode } = useOnboarding();
   const { mode, setMode } = useMode();
-  const { t } = useI18n();
+  const { t, locale, setLocale } = useI18n();
+  const { isDark, toggle: toggleTheme } = useTheme();
   const { vaults, loading: vaultsLoading } = useVaults(registry, account);
 
   const [selectedGoal, setSelectedGoal] = React.useState<GoalKey | null>(null);
@@ -182,6 +184,44 @@ export default function LandingPage() {
               </button>
             ))}
           </div>
+
+          {/* Language toggle */}
+          <div className="flex items-center gap-1 rounded-lg p-1" style={{ background: 'var(--card)' }}>
+            {(['en', 'es'] as const).map((l) => (
+              <button
+                key={l}
+                onClick={() => setLocale(l)}
+                className={cn('px-3 py-1 text-xs font-medium rounded-md transition-all duration-150',
+                  locale === l ? '' : 'opacity-50 hover:opacity-70'
+                )}
+                style={locale === l
+                  ? { background: 'var(--primary)', color: '#fff' }
+                  : { color: 'var(--text-muted)' }
+                }
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-1.5 rounded-lg transition-colors hover:opacity-70 flex items-center justify-center"
+            style={{ color: 'var(--text-muted)', background: 'var(--card)' }}
+            aria-label={t('settings.theme.toggle')}
+          >
+            {isDark ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="5" strokeWidth="2" strokeLinecap="round" />
+                <path strokeWidth="2" strokeLinecap="round" d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+              </svg>
+            )}
+          </button>
         </div>
       </header>
 

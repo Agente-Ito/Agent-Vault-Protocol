@@ -76,14 +76,18 @@ const BudgetPolicyAbi = [
   'function spent() external view returns (uint256)',
   'function periodStart() external view returns (uint256)',
   'function budgetToken() external view returns (address)',
+  'function ownerSetBudget(uint256 newBudget) external',
 ];
 
 const MerchantPolicyAbi = [
   'function getMerchants() external view returns (address[])',
+  'function addMerchants(address[] calldata merchants) external',
+  'function removeMerchant(address merchant) external',
 ];
 
 const ExpirationPolicyAbi = [
   'function expiration() external view returns (uint256)',
+  'function setExpiration(uint256 newExpiration) external',
 ];
 
 const AgentBudgetPolicyAbi = [
@@ -182,3 +186,11 @@ export const getCoordinatorContract = (address: string, provider: Provider | Sig
 
 export const getSchedulerContract = (address: string, provider: Provider | Signer): SchedulerContract =>
   new Contract(address, SchedulerAbi, provider) as SchedulerContract;
+
+const LSP7DemoTokenAbi = [
+  'function mint(address to, uint256 amount) external',
+  'function balanceOf(address account) external view returns (uint256)',
+];
+
+export const getLSP7DemoTokenContract = (address: string, provider: Provider | Signer) =>
+  new Contract(address, LSP7DemoTokenAbi, provider);

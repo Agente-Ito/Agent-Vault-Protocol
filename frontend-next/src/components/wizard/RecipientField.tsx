@@ -4,6 +4,7 @@ import React, { useState, useCallback } from 'react';
 import { useI18n } from '@/context/I18nContext';
 import type { RecipientEntry } from '@/context/OnboardingContext';
 import { normalizeRecipient, validateRecipient } from '@/lib/web3/deployVault';
+import { ProfilePicker } from '@/components/profiles/ProfilePicker';
 
 interface RecipientFieldProps {
   recipients: RecipientEntry[];
@@ -17,6 +18,7 @@ export function RecipientField({ recipients, onAdd, onRemove, placeholder }: Rec
   const [label, setLabel] = useState('');
   const [input, setInput] = useState('');
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const handleAdd = useCallback(() => {
     const trimmed = input.trim();
@@ -49,8 +51,39 @@ export function RecipientField({ recipients, onAdd, onRemove, placeholder }: Rec
     if (e.key === 'Enter') { e.preventDefault(); handleAdd(); }
   };
 
+  const handlePickerConfirm = useCallback((addresses: string[]) => {
+    for (const addr of addresses) {
+      if (validateRecipient(addr)) continue;
+      const normalized = normalizeRecipient(addr);
+      if (recipients.some((r) => r.address.toLowerCase() === normalized.toLowerCase())) continue;
+      onAdd({ address: normalized });
+    }
+  }, [recipients, onAdd]);
+
   return (
     <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {recipients.length > 0 ? `${recipients.length} added` : ''}
+        </span>
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="text-xs font-medium transition-opacity hover:opacity-80"
+          style={{ color: 'var(--accent)' }}
+        >
+          👤 {t('wizard.limits.from_profiles')}
+        </button>
+      </div>
+
+      <ProfilePicker
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onConfirm={handlePickerConfirm}
+        mode="merchants"
+        preSelected={recipients.map((r) => r.address)}
+      />
+
       <div className="grid gap-2 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto]">
         <input
           type="text"

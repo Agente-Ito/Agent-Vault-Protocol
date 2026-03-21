@@ -3,8 +3,6 @@ import type { NextConfig } from "next";
 const requiredEnvVars = [
   "NEXT_PUBLIC_RPC_URL",
   "NEXT_PUBLIC_REGISTRY_ADDRESS",
-  "NEXT_PUBLIC_BASE_RPC_URL",
-  "NEXT_PUBLIC_BASE_VAULT_FACTORY_ADDRESS",
 ] as const;
 
 function validateProductionEnv() {

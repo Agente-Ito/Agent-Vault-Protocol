@@ -275,27 +275,27 @@ npm test -- --grep "VaultDirectory"
 
 ---
 
-## 🌐 Frontend Setup
+## 🌐 Frontend
 
-### Next.js 15
+Next.js 15 app with a fully static build — no serverless runtime required. Deployable to Vercel with two environment variables.
 
 ```bash
 cd frontend-next
 npm install
-cat > .env.local <<'EOF'
-NEXT_PUBLIC_RPC_URL=http://localhost:8545
-NEXT_PUBLIC_REGISTRY_ADDRESS=<registry_address>
-EOF
-npm run dev
+# create .env.local with the two vars below
+npm run dev        # http://localhost:3000
+npm run build      # production build (validates env)
 ```
 
-Open: `http://localhost:3000`
+**Required env vars:**
+```
+NEXT_PUBLIC_RPC_URL=https://rpc.testnet.lukso.network
+NEXT_PUBLIC_REGISTRY_ADDRESS=0x<registry>
+```
 
-**Features**:
-- Server-side rendering
-- Dynamic vault pages
-- Real-time updates
-- Production-ready
+**Key capabilities**: vault creation wizard, mission controller lifecycle (create / pause / resume / revoke), browser-side agent execution (simulate → send), LUKSO Universal Profile directory, encrypted local key storage (IndexedDB + AES-GCM, never leaves the browser).
+
+See [`frontend-next/README.md`](./frontend-next/README.md) for full documentation.
 
 ---
 
@@ -500,9 +500,15 @@ cd frontend-next && npm run dev  # Next.js 15
 
 ## ✅ Status
 
-- **Phase 1**: Complete (111/119 tests ✅)
-- **Phase 2**: In planning
+- **Contracts**: Phase 1 complete (111/119 tests ✅)
+- **Frontend**: Live on LUKSO Testnet — vaults, missions, browser-side execution
 - **Testnet**: Ready for deployment
 - **Mainnet**: Post-audit
 
 **Last Updated**: March 2026
+
+---
+
+## 📄 License
+
+MIT — see [`LICENSE`](./LICENSE).

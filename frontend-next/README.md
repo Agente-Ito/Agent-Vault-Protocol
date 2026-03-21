@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vaultia — Frontend
 
-## Getting Started
+Next.js 15 frontend for the Agent Vault Protocol. Lets users create and manage policy-governed financial vaults on LUKSO, assign AI agent controllers with isolated keypairs, and execute payments directly from the browser.
 
-First, run the development server:
+## Stack
+
+- **Next.js 15** — App Router, fully static export (no server-side runtime required)
+- **ethers.js v6** — All on-chain interaction, LSP6 KeyManager routing
+- **RainbowKit + wagmi** — Wallet connection
+- **IndexedDB** — Local encrypted storage for controller keys (never sent to any server)
+- **Tailwind CSS + CSS custom properties** — Theming system compatible with LUKSO's design language
+
+## Features
+
+| Area | What it does |
+|---|---|
+| **Vaults** | Deploy policy vaults via `AgentVaultRegistry` with budget, period, merchant whitelist, and agent permissions |
+| **Missions** | Create isolated LSP6 controller keypairs per spending objective, set on-chain permissions from preset templates |
+| **Run (manual)** | Browser-side transaction execution — unlock controller key with passphrase, simulate via PolicyEngine, send via KeyManager |
+| **Pause / Resume** | Zero-out or restore controller permissions on-chain via `km.execute()` |
+| **Kill Switch** | Permanently revoke controller permissions on-chain |
+| **Profiles** | Browse and save LUKSO Universal Profile contacts; use them as recipients directly in the vault wizard |
+| **Simple wizard** | 5-step guided vault creation with goal presets, automation config, and safety levels |
+
+## Network support
+
+| Network | Vaults | Missions | Automation |
+|---|---|---|---|
+| **LUKSO Testnet (4201)** | ✅ | ✅ | ✅ |
+| **LUKSO Mainnet (42)** | ✅ | ✅ | ✅ |
+| Base | Coming soon | — | — |
+
+## Local development
+
+```bash
+cd frontend-next
+npm install
+```
+
+Create `.env.local`:
+
+```env
+NEXT_PUBLIC_RPC_URL=https://rpc.testnet.lukso.network
+NEXT_PUBLIC_REGISTRY_ADDRESS=0x...
+```
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy to Vercel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Set two environment variables in the Vercel dashboard:
 
-## Learn More
+```
+NEXT_PUBLIC_RPC_URL=https://rpc.testnet.lukso.network
+NEXT_PUBLIC_REGISTRY_ADDRESS=0x<your_registry_address>
+```
 
-To learn more about Next.js, take a look at the following resources:
+Then push — all routes are static, no serverless functions required.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Security model for controller keys
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Keys are generated with `ethers.Wallet.createRandom()` entirely in the browser
+- Encrypted with AES-GCM (256-bit), key derived via PBKDF2 (200 000 iterations) from a user passphrase
+- Stored in IndexedDB — not in localStorage, not in cookies, never sent to any server
+- Held in a React `ref` after unlock (not in state), auto-locked after 15 minutes of inactivity or on tab blur
+- The passphrase is never stored anywhere
 
-## Deploy on Vercel
+## Environment variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_RPC_URL` | Yes | LUKSO JSON-RPC endpoint |
+| `NEXT_PUBLIC_REGISTRY_ADDRESS` | Yes | Deployed `AgentVaultRegistry` contract address |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+MIT — see [`LICENSE`](../LICENSE) at the repository root.

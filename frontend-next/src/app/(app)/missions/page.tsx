@@ -64,7 +64,7 @@ export default function MissionsPage() {
       )}
 
       {!loading && missions.length > 0 && (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {missions.map((mission) => (
             <MissionCard key={mission.id} mission={mission} onUpdate={reload} />
           ))}

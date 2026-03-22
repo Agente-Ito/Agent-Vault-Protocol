@@ -286,13 +286,21 @@ describe("TaskScheduler", () => {
       );
     });
 
-    it("should allow any address to execute by default", async () => {
+    it("should enable whitelist and trust the owner by default", async () => {
       const enabled = await scheduler.keeperWhitelistEnabled();
-      expect(enabled).to.be.false;
+      expect(enabled).to.be.true;
+      expect(await scheduler.isWhitelistedKeeper(owner.address)).to.be.true;
+    });
+
+    it("should block non-whitelisted keepers by default", async () => {
+      await time.increase(200);
+
+      await expect(
+        scheduler.connect(keeper2).executeTask(taskId)
+      ).to.be.revertedWith("TS: keeper not whitelisted");
     });
 
     it("should restrict execution to whitelisted keepers when enabled", async () => {
-      await scheduler.setKeeperWhitelistEnabled(true);
       await scheduler.addKeeper(keeper1.address);
 
       expect(await scheduler.isWhitelistedKeeper(keeper1.address)).to.be.true;
@@ -300,7 +308,6 @@ describe("TaskScheduler", () => {
     });
 
     it("should manage keeper whitelist", async () => {
-      await scheduler.setKeeperWhitelistEnabled(true);
       await scheduler.addKeeper(keeper1.address);
 
       expect(await scheduler.isWhitelistedKeeper(keeper1.address)).to.be.true;

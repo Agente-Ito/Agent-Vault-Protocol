@@ -52,6 +52,8 @@ const SCHEDULER_ABI = [
   'function executeTask(bytes32 taskId) external returns (bool success)',
   'function getTask(bytes32 taskId) external view returns (address vault, address keyManager, bytes executeCalldata, uint8 triggerType, uint256 nextExecution, uint256 interval, bool enabled, uint256 createdAt)',
   'function getTaskCount() external view returns (uint256)',
+  'function keeperWhitelistEnabled() external view returns (bool)',
+  'function isWhitelistedKeeper(address keeper) external view returns (bool)',
   'event TaskExecuted(bytes32 indexed taskId, uint256 newNextExecution, uint256 executedAt)',
 ];
 
@@ -171,9 +173,25 @@ async function main() {
   }
 
   const taskCount = await scheduler.getTaskCount();
+  const whitelistEnabled = await scheduler.keeperWhitelistEnabled();
+  const keeperAllowed = whitelistEnabled
+    ? await scheduler.isWhitelistedKeeper(wallet.address)
+    : true;
+
+  if (whitelistEnabled && !keeperAllowed) {
+    log('error', 'Keeper is not whitelisted on TaskScheduler', {
+      address: wallet.address,
+      scheduler: SCHEDULER_ADDR,
+      action: 'Add this keeper on-chain with addKeeper(address) or disable whitelist intentionally via setKeeperWhitelistEnabled(false).',
+    });
+    process.exit(1);
+  }
+
   log('info', 'TaskScheduler ready', {
     address: SCHEDULER_ADDR,
     registeredTasks: taskCount.toString(),
+    keeperWhitelistEnabled: whitelistEnabled,
+    keeperAllowed,
   });
 
   // ── Initial run ──────────────────────────────────────────────────────────────

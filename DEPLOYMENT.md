@@ -65,17 +65,20 @@ npm run deploy:testnet
 The script will:
 
 1. ✅ Validate your account balance
-2. ✅ Deploy `AgentVaultRegistry` (factory)
-3. ✅ Deploy `MerchantRegistry` (optional directory)
-4. ✅ Deploy a demo vault with:
+2. ✅ Deploy `MerchantRegistry` (optional directory)
+3. ✅ Deploy `AgentVaultDeployerCore`, `AgentVaultDeployer`, and `AgentKMDeployer`
+4. ✅ Deploy `TaskScheduler` with keeper whitelist enabled by default and the deployer as the initial keeper
+5. ✅ Deploy `AgentCoordinator` and `SharedBudgetPool`
+6. ✅ Deploy `AgentVaultRegistry` and wire protocol authorizations into `AgentCoordinator` and `SharedBudgetPool`
+7. ✅ Deploy a demo vault with:
    - **AgentSafe** (LSP9Vault)
    - **PolicyEngine** (policy orchestrator)
    - **BudgetPolicy** (100 LYX/week limit)
    - **LSP6KeyManager** (permission controller)
-5. ✅ Accept LSP14 two-step ownership transfers
-6. ✅ Fund the vault with 50 LYX
-7. ✅ Update `.env` with all contract addresses
-8. ✅ Display Block Explorer links
+8. ✅ Accept LSP14 two-step ownership transfers
+9. ✅ Fund the vault with 50 LYX
+10. ✅ Update `.env` with all contract addresses
+11. ✅ Display Block Explorer links
 
 ### Example Output
 
@@ -144,12 +147,21 @@ The script will:
 - **Type**: Policy orchestrator
 - **Role**: Runs validation chain for each payment
 - **Policies**: BudgetPolicy (mandatory) + optional MerchantPolicy + ExpirationPolicy
+- **Emergency stop**: `setPaused(true)` freezes all safe-routed execution for that vault
 
 ### LSP6KeyManager
 
 - **Type**: Permission controller (native LUKSO standard)
 - **Role**: Acts as intermediary for all agent transactions
 - **Permissions**: Grants agents SUPER_CALL | SUPER_TRANSFERVALUE (actual restrictions in PolicyEngine)
+
+### TaskScheduler
+
+- **Type**: Recurring execution scheduler
+- **Role**: Lets off-chain keepers trigger eligible tasks on-chain
+- **Security default**: keeper whitelist is enabled at deploy time
+- **Initial keeper**: the deployer is whitelisted automatically in the constructor
+- **Operations**: add backup keepers with `addKeeper(address)` or disable whitelist explicitly only if you intend to run an open executor model
 
 ### BudgetPolicy
 
@@ -183,6 +195,45 @@ const tx = await km.connect(agentWallet).execute(OPERATION_CALL, safe.address, 0
 await tx.wait();
 ```
 
+## Emergency Operations
+
+### Pause a vault immediately
+
+If you need to freeze all agent-routed execution for a deployed vault, pause its `PolicyEngine`:
+
+```bash
+const pe = await ethers.getContractAt("PolicyEngine", process.env.POLICY_ENGINE_ADDRESS);
+await pe.setPaused(true);
+```
+
+Effect:
+
+- `PolicyEngine.validate()` reverts with `PE: paused`
+- all `AgentSafe` payments that depend on policy validation are blocked
+- `simulateExecution()` returns a paused result instead of a pass/fail policy scan
+
+Resume by calling:
+
+```bash
+await pe.setPaused(false);
+```
+
+### Add a backup keeper
+
+The scheduler is no longer open by default. To allow a second keeper process:
+
+```bash
+const scheduler = await ethers.getContractAt("TaskScheduler", process.env.TASK_SCHEDULER_ADDRESS);
+await scheduler.addKeeper("0xBackupKeeper...");
+```
+
+If your operational model intentionally wants any address to execute eligible tasks,
+the owner can opt out of whitelist enforcement:
+
+```bash
+await scheduler.setKeeperWhitelistEnabled(false);
+```
+
 ## Troubleshooting
 
 ### "Deployer balance is 0"
@@ -200,6 +251,16 @@ await tx.wait();
 ### "acceptOwnership failed"
 
 → Contracts may already have different owners. Check block explorer.
+
+### "TS: keeper not whitelisted"
+
+→ `TaskScheduler` now starts with whitelist enforcement enabled. Add the keeper
+address with `addKeeper()` or use the deployer account as the initial keeper.
+
+### "PE: paused"
+
+→ The vault's `PolicyEngine` is currently frozen. Call `setPaused(false)` from
+the owner account after the incident or maintenance window is resolved.
 
 ### "VaultDeployed event not found"
 

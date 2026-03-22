@@ -7,7 +7,7 @@ The protocol allows autonomous agents to execute payments while enforcing strict
 ## 🏗️ Core Architecture
 
 - AgentSafe (LSP9 vault execution layer)
-- PolicyEngine (policy orchestration layer)
+- PolicyEngine (policy orchestration layer + vault-wide emergency pause)
 - Policies (modular validation contracts)
 - AgentVaultRegistry (atomic vault deployment)
 
@@ -40,6 +40,7 @@ AgentCoordinator
 TaskScheduler
   ├─ TIMESTAMP triggers (subscriptions, payroll)
   ├─ BLOCK_NUMBER triggers (DeFi automation)
+  ├─ Whitelisted keeper execution (enabled by default)
   ├─ Off-chain keeper discovery
   └─ Recurring task support
 ```
@@ -213,6 +214,10 @@ await scheduler.createTask(
   2592000              // interval: 30 days
 );
 
+// Security default: keeper whitelist starts enabled.
+// The deployer/owner is added as the initial keeper automatically.
+await scheduler.addKeeper(backupKeeperAddress);
+
 // Schedule strategy execution (BLOCK_NUMBER trigger)
 await scheduler.createTask(
   ethers.id("RebalanceTask"),
@@ -230,6 +235,33 @@ eligible.forEach(taskId => {
   keeper.executeTask(taskId);  // triggers on-chain execution
 });
 ```
+
+**Operational note:** `TaskScheduler` no longer starts open to arbitrary executors.
+The keeper whitelist is enabled by default at deployment time, and only explicitly
+whitelisted keepers can call `executeTask()` unless the owner disables the whitelist.
+
+### PolicyEngine: Vault-Wide Kill Switch
+
+```typescript
+// Freeze all payments routed through this vault's PolicyEngine
+await policyEngine.setPaused(true);
+
+// Dry-runs also reflect the paused state
+const [blockingPolicy, reason] = await policyEngine.simulateExecution.staticCall(
+  agentAddress,
+  ethers.ZeroAddress,
+  merchantAddress,
+  ethers.parseEther("1"),
+  "0x"
+);
+
+// Resume normal operation
+await policyEngine.setPaused(false);
+```
+
+When `paused == true`, every safe-routed execution that depends on `PolicyEngine.validate()`
+reverts with `PE: paused`. This is the protocol's primary vault-level emergency stop,
+allowing owners to freeze execution without removing policies one by one.
 
 ### VaultDirectory: Metadata for Dashboards
 
@@ -429,7 +461,11 @@ frontend-next/                     (Next.js 15)
 - ✅ Max pool depth = 4 (prevents stack exhaustion)
 - ✅ Only authorized policy can recordSpend()
 - ✅ Contract agents have optional gas limits
-- ✅ No reentrancy vectors (stateless external calls)
+- ✅ Critical execution paths use `ReentrancyGuard`
+- ✅ Vaults have layered caps: vault, agent, recipient, and shared pool ceilings
+- ✅ Agent registration and capability assignment are gated by `owner` / `roleAdmin`, not public
+- ✅ `PolicyEngine.setPaused()` provides a vault-wide emergency stop
+- ✅ `TaskScheduler` starts with keeper whitelist enabled by default
 
 ### For End Users
 
@@ -437,6 +473,13 @@ frontend-next/                     (Next.js 15)
 - ⚠️ `agentDemo` is backend-only (not wallet app)
 - ⚠️ Use LUKSO wallet or Metamask to interact with UI
 - ⚠️ LSP14 two-step ownership: must `acceptOwnership()` after deploy
+
+### Security Model Clarifications
+
+- `ReentrancyGuard` is present on the main payment and scheduling entry points; reentrancy protection is not missing in the current codebase.
+- Spend caps are enforced on-chain through policy validation, not by off-chain convention.
+- Agent registration is not permissionless: `AgentCoordinator.registerAgent()`, role assignment, and capability grants are restricted to the configured admin path.
+- The main remaining operational hardening concern is governance and incident response: owners should protect `owner` / `roleAdmin` with a multisig and maintain a clear emergency procedure for pause, keeper rotation, and policy changes.
 
 ---
 

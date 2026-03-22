@@ -115,6 +115,35 @@ describe("PolicyEngine", function () {
       await expect(pe.removePolicy(0)).to.be.revertedWith("PE: out of bounds");
     });
   });
+
+  describe("pause control", function () {
+    it("should block safe-routed validation while paused", async function () {
+      await pe.addPolicy(await budget.getAddress());
+      await safe.setPolicyEngine(await pe.getAddress());
+      await safe.setKeyManager(agent.address);
+      await owner.sendTransaction({ to: await safe.getAddress(), value: ethers.parseEther("10") });
+
+      await pe.setPaused(true);
+
+      await expect(
+        safe.connect(agent).agentExecute(merchant.address, ethers.parseEther("1"), "0x")
+      ).to.be.revertedWith("PE: paused");
+    });
+
+    it("should return a paused result from simulateExecution", async function () {
+      await pe.setPaused(true);
+      const result = await pe.simulateExecution.staticCall(
+        agent.address,
+        ethers.ZeroAddress,
+        merchant.address,
+        100n,
+        "0x"
+      );
+
+      expect(result[0]).to.equal(await pe.getAddress());
+      expect(result[1]).to.equal("PE: paused");
+    });
+  });
 });
 
 describe("BudgetPolicy", function () {

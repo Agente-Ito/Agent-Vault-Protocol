@@ -27,8 +27,9 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 ///   2. SINGLE KEEPER = SINGLE POINT OF FAILURE — Operators running only one
 ///      keeper instance accept the risk that downtime = missed executions.
 ///      Mitigation: run multiple independent keeper instances (different machines,
-///      different operators). With keeperWhitelistEnabled = false, any address can
-///      call executeTask(), allowing community/backup keepers.
+///      different operators). The scheduler now starts with the deployer whitelisted
+///      and whitelist enforcement enabled; backup/community keepers must be added
+///      explicitly by the owner.
 ///
 ///   3. CATCH-UP BEHAVIOUR — If a keeper is offline for N intervals, only one
 ///      execution fires when it comes back online (nextExecution += interval once).
@@ -71,7 +72,7 @@ contract TaskScheduler is Ownable, ReentrancyGuard {
     /// @notice Minimum interval for TIMESTAMP-triggered tasks (prevents keeper spam)
     uint256 public constant MIN_TIMESTAMP_INTERVAL = 60; // 1 minute
 
-    /// @notice Keeper whitelist (optional: if configured, only whitelisted keepers can execute)
+    /// @notice Keeper whitelist. Enforced by default from deployment time onward.
     mapping(address => bool) public isWhitelistedKeeper;
     bool public keeperWhitelistEnabled;
 
@@ -107,10 +108,14 @@ contract TaskScheduler is Ownable, ReentrancyGuard {
     // ═════════════════════════════════════════════════════════════════════
 
     constructor() {
-        keeperWhitelistEnabled = false;  // Default: anyone can execute
+        keeperWhitelistEnabled = true;
+        isWhitelistedKeeper[msg.sender] = true;
+        emit KeeperWhitelistChanged(true);
+        emit KeeperAdded(msg.sender);
     }
 
     /// @notice Enable/disable keeper whitelist
+    /// @dev The deployer is whitelisted by default in the constructor.
     function setKeeperWhitelistEnabled(bool enabled) external onlyOwner {
         keeperWhitelistEnabled = enabled;
         emit KeeperWhitelistChanged(enabled);

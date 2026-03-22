@@ -37,6 +37,7 @@ const PE_RUN_ABI = [
 const SAFE_RUN_IFACE = new ethers.Interface(SAFE_RUN_ABI);
 
 function StatusBadge({ status }: { status: MissionRecord['status'] }) {
+  const { t } = useI18n();
   const variant =
     status === 'active' ? 'success' :
     status === 'paused' ? 'warning' :
@@ -49,9 +50,9 @@ function StatusBadge({ status }: { status: MissionRecord['status'] }) {
           style={{ background: 'currentColor' }}
         />
       )}
-      {status === 'active' ? 'Active' :
-       status === 'paused' ? '⏸ Paused' :
-       status === 'revoked' ? '✕ Revoked' : '⚠ Error'}
+      {status === 'active' ? t('missions.status.active') :
+       status === 'paused' ? `⏸ ${t('missions.status.paused')}` :
+       status === 'revoked' ? `✕ ${t('missions.status.revoked')}` : `⚠ ${t('missions.status.error')}`}
     </Badge>
   );
 }

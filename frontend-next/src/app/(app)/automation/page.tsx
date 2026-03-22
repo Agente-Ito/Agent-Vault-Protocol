@@ -44,6 +44,11 @@ export default function AutomationPage() {
         <Button size="sm" onClick={() => setShowWizard(true)}>{t('automation.new_task')}</Button>
       </div>
 
+      <div className="rounded-xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+        <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{t('automation.ops_title')}</p>
+        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{t('automation.ops_desc')}</p>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {[
           { emoji: '✅', label: t('automation.summary.active'),    value: enabledCount },

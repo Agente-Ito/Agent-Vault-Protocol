@@ -10,9 +10,15 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 ///         FIX #9: restricted to the linked AgentSafe — prevents external callers
 ///         from draining BudgetPolicy.spent by calling validate() directly.
 ///         FIX #17: MAX_POLICIES = 20 prevents gas DoS via unbounded policy loop.
+///         Includes a native pause switch so owners can freeze all safe-routed
+///         payments without reconfiguring every policy individually.
 contract PolicyEngine is Ownable, ReentrancyGuard {
     /// @dev Only the linked AgentSafe can call validate()
     address public immutable safe;
+
+    /// @notice Emergency stop for all validations routed through this engine.
+    ///         When paused, every payment routed through the linked safe is blocked.
+    bool public paused;
 
     address[] public policies;
     /// @dev FIX #10: duplicate guard — prevents same policy being added twice
@@ -39,6 +45,7 @@ contract PolicyEngine is Ownable, ReentrancyGuard {
         uint256 amount,
         string reason
     );
+    event PauseStatusChanged(bool paused);
 
     modifier onlySafe() {
         require(msg.sender == safe, "PE: only safe");
@@ -64,6 +71,7 @@ contract PolicyEngine is Ownable, ReentrancyGuard {
         uint256 amount,
         bytes calldata data
     ) external onlySafe {
+        require(!paused, "PE: paused");
         uint256 len = policies.length;
         for (uint256 i = 0; i < len; i++) {
             IPolicy(policies[i]).validate(agent, token, to, amount, data);
@@ -152,6 +160,9 @@ contract PolicyEngine is Ownable, ReentrancyGuard {
         uint256 amount,
         bytes calldata data
     ) external nonReentrant returns (address blockingPolicy, string memory reason) {
+        if (paused) {
+            return (address(this), "PE: paused");
+        }
         require(!simulationActive, "PE: simulation reentrant");
         simulationActive = true;
 
@@ -192,5 +203,12 @@ contract PolicyEngine is Ownable, ReentrancyGuard {
     ///      simulateExecution. Should never be needed in normal operation.
     function emergencyResetSimulation() external onlyOwner {
         simulationActive = false;
+    }
+
+    /// @notice Pause or unpause the policy engine.
+    /// @dev This acts as a vault-wide kill switch because every payment must pass through validate().
+    function setPaused(bool shouldPause) external onlyOwner {
+        paused = shouldPause;
+        emit PauseStatusChanged(shouldPause);
     }
 }

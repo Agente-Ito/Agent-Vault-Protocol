@@ -36,6 +36,11 @@ export default function MissionsPage() {
         <span>{t('missions.trust_copy')}</span>
       </p>
 
+      <p className="text-xs flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+        <span>⏸️</span>
+        <span>{t('missions.pause_scope_note')}</span>
+      </p>
+
       {error && (
         <Alert variant="error"><AlertDescription>{error}</AlertDescription></Alert>
       )}

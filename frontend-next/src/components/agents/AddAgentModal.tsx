@@ -277,6 +277,27 @@ export function AddAgentModal({ vault, open, onClose, onSuccess }: AddAgentModal
                     </button>
                   );
                 })}
+
+                {/* Coming-next mode card */}
+                <div
+                  className="w-full rounded-xl px-4 py-3 text-left opacity-60 cursor-not-allowed"
+                  style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+                >
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                      {t('add_agent.mode.vault_manager')}
+                    </p>
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs"
+                      style={{ background: 'rgba(34,255,178,0.12)', color: 'var(--accent)' }}
+                    >
+                      {t('add_agent.mode.vault_manager_badge')}
+                    </span>
+                  </div>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {t('add_agent.mode.vault_manager_desc')}
+                  </p>
+                </div>
               </div>
             </div>
           )}

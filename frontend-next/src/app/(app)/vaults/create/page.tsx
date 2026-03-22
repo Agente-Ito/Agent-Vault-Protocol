@@ -14,6 +14,7 @@ import { useAgents } from '@/hooks/useAgents';
 import { useWeb3 } from '@/context/Web3Context';
 import { useI18n } from '@/context/I18nContext';
 import { AddressDisplay } from '@/components/common/AddressDisplay';
+import { AddAgentModal, type VaultRef } from '@/components/agents/AddAgentModal';
 import { cn } from '@/lib/utils/cn';
 import { verifyPermissionsWrite } from '@/lib/verifyWrite';
 import {
@@ -356,6 +357,7 @@ export default function CreateVaultPage() {
   const [status, setStatus]                             = useState('');
   const [loading, setLoading]                           = useState(false);
   const [deployed, setDeployed]                         = useState<{ safe: string; keyManager: string; policyEngine: string } | null>(null);
+  const [agentModalOpen, setAgentModalOpen]             = useState(false);
 
   const [step, setStep]                                 = useState(1);
   const [activeTemplate, setActiveTemplate]             = useState<string | null>(null);
@@ -510,10 +512,28 @@ export default function CreateVaultPage() {
             </div>
           ))}
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <Button variant="primary" onClick={() => router.push('/vaults')}>{t('create.success.view_vaults')}</Button>
-          <Button variant="secondary" onClick={() => { setDeployed(null); setStatus(''); setStep(1); }}>{t('create.success.create_another')}</Button>
+          <Button variant="secondary" onClick={() => setAgentModalOpen(true)}>{t('create.success.add_agent_cta')}</Button>
+          <Button variant="ghost" onClick={() => { setDeployed(null); setStatus(''); setStep(1); }}>{t('create.success.create_another')}</Button>
         </div>
+        {deployed && signer && (
+          <AddAgentModal
+            vault={{
+              chain: 'lukso',
+              vaultSafe: deployed.safe,
+              keyManager: deployed.keyManager,
+              label: label || 'New Vault',
+              signer,
+            } satisfies VaultRef}
+            open={agentModalOpen}
+            onClose={() => setAgentModalOpen(false)}
+            onSuccess={() => {
+              setAgentModalOpen(false);
+              router.push('/vaults');
+            }}
+          />
+        )}
       </div>
     );
   }

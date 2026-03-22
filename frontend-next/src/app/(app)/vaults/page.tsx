@@ -252,6 +252,9 @@ function VaultCard({
               >
                 {t('vaults.card.manage_agents')}
               </Button>
+              <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+                {t('vaults.agent_delegation.coming_soon_note')}
+              </p>
             )}
 
             {/* ── Policy management (owner only) ──────────────────────────── */}
